@@ -149,9 +149,12 @@ def find_best_for_format(original: Image.Image, limit_bytes: int, fmt: str) -> C
     return best
 
 
-def optimize_image(image_path: Path, limit_bytes: int, output_dir: Path) -> Candidate:
+def optimize_image(image_path: Path, limit_bytes: int, output_dir: Path, format_override: str | None = None) -> Candidate:
     original = Image.open(image_path)
-    formats = ["WEBP", "PNG"] if original.mode in ("RGBA", "LA") else ["JPEG", "WEBP", "PNG"]
+    if format_override:
+        formats = [format_override.upper()]
+    else:
+        formats = ["WEBP", "PNG"] if original.mode in ("RGBA", "LA") else ["JPEG", "WEBP", "PNG"]
     candidates: list[Candidate] = []
     for fmt in formats:
         best = find_best_for_format(get_working_image(original, fmt), limit_bytes, fmt)
@@ -172,12 +175,18 @@ def optimize_image(image_path: Path, limit_bytes: int, output_dir: Path) -> Cand
     return best
 
 
-def interactive_inputs() -> tuple[list[str], str, str]:
+def interactive_inputs() -> tuple[list[str], str, str, str | None]:
     raw_paths = input("Enter file/folder paths (comma separated): ").strip()
     limit = input("Enter max size per image (e.g. 400kb, 1.5mb): ").strip()
     output = input("Output folder [./reduced]: ").strip() or "./reduced"
-    paths = [value.strip() for value in raw_paths.split(",") if value.strip()]
-    return paths, limit, output
+    fmt = input("Output format [auto] (jpeg/png/webp): ").strip().lower() or None
+    if fmt and fmt not in ("jpeg", "jpg", "png", "webp"):
+        print(f"Invalid format '{fmt}'. Using auto-selection.")
+        fmt = None
+    if fmt == "jpg":
+        fmt = "jpeg"
+    paths = [value.strip().strip("'\"" ) for value in raw_paths.split(",") if value.strip()]
+    return paths, limit, output, fmt
 
 
 def main() -> None:
@@ -185,14 +194,16 @@ def main() -> None:
     parser.add_argument("paths", nargs="*", help="Image files and/or folders")
     parser.add_argument("--limit", help="Max output size per image (e.g. 500kb, 1.5mb)")
     parser.add_argument("--output", default="./reduced", help="Output directory")
+    parser.add_argument("--format", help="Output format (jpeg, png, webp). If not specified, auto-selects best format.")
     args = parser.parse_args()
 
     paths = args.paths
     limit = args.limit
     output_dir = args.output
+    fmt = args.format
     if not paths or not limit:
         print("Starting interactive mode...")
-        paths, limit, output_dir = interactive_inputs()
+        paths, limit, output_dir, fmt = interactive_inputs()
 
     limit_bytes = parse_size_limit(limit)
 
@@ -203,9 +214,12 @@ def main() -> None:
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
 
-    print(f"Processing {len(image_files)} image(s) with limit {limit_bytes} bytes")
+    if fmt:
+        print(f"Processing {len(image_files)} image(s) with limit {limit_bytes} bytes (format: {fmt.upper()})")
+    else:
+        print(f"Processing {len(image_files)} image(s) with limit {limit_bytes} bytes")
     for image in image_files:
-        optimize_image(image, limit_bytes, output_path)
+        optimize_image(image, limit_bytes, output_path, fmt)
     print("All images processed.")
 
 
