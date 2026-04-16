@@ -22,6 +22,12 @@ class Candidate:
     total_score: float
 
 
+def is_better(candidate: Candidate, current: Candidate | None) -> bool:
+    if current is None:
+        return True
+    return (candidate.total_score, candidate.size_bytes) > (current.total_score, current.size_bytes)
+
+
 def parse_size_limit(text: str) -> int:
     value = text.strip().lower()
     if not value:
@@ -113,7 +119,7 @@ def find_best_for_format(original: Image.Image, limit_bytes: int, fmt: str) -> C
 
         if fmt == "PNG":
             candidate = evaluate_candidate(original, resized, fmt, None, limit_bytes)
-            if candidate and (best is None or (candidate.total_score, candidate.size_bytes) > (best.total_score, best.size_bytes)):
+            if candidate and is_better(candidate, best):
                 best = candidate
             continue
 
@@ -128,11 +134,7 @@ def find_best_for_format(original: Image.Image, limit_bytes: int, fmt: str) -> C
             else:
                 hi = mid - 1
 
-        if best_quality_candidate and (
-            best is None
-            or (best_quality_candidate.total_score, best_quality_candidate.size_bytes)
-            > (best.total_score, best.size_bytes)
-        ):
+        if best_quality_candidate and is_better(best_quality_candidate, best):
             best = best_quality_candidate
     return best
 
@@ -169,9 +171,7 @@ def interactive_inputs() -> tuple[list[str], str, str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="AI-assisted local image reducer that maximizes quality under a size limit."
-    )
+    parser = argparse.ArgumentParser(description="Automated local image reducer that maximizes quality under a size limit.")
     parser.add_argument("paths", nargs="*", help="Image files and/or folders")
     parser.add_argument("--limit", help="Max output size per image (e.g. 500kb, 1.5mb)")
     parser.add_argument("--output", default="./reduced", help="Output directory")

@@ -20,8 +20,8 @@ pip install -r requirements.txt
 python kvgrainy.py --limit 400kb --output ./reduced ./images
 ```
 
-If you omit arguments, KVGrainy starts an interactive prompt ("chat-like" flow)
-to ask for paths and limits.
+If you omit arguments, KVGrainy starts an interactive prompt to ask for paths
+and limits.
 
 ## CLI
 
