@@ -195,8 +195,6 @@ def main() -> None:
         paths, limit, output_dir = interactive_inputs()
 
     limit_bytes = parse_size_limit(limit)
-    if limit_bytes <= 0:
-        raise ValueError("Size limit must be greater than zero")
 
     image_files = iter_images(paths)
     if not image_files:
