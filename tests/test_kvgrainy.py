@@ -28,11 +28,12 @@ class KVGrainyTests(unittest.TestCase):
             input_image = tmp_path / "input.jpg"
             output_dir = tmp_path / "output"
             output_dir.mkdir()
-            image = Image.new("RGB", (1200, 800))
+            width, height = 600, 400
+            image = Image.new("RGB", (width, height))
             pixels = [
                 ((x * y) % 255, (x + y) % 255, (x * 2 + y * 3) % 255)
-                for y in range(800)
-                for x in range(1200)
+                for y in range(height)
+                for x in range(width)
             ]
             image.putdata(pixels)
             image.save(input_image, quality=98)
