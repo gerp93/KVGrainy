@@ -11,7 +11,7 @@ from kvgrainy import iter_images, parse_size_limit, optimize_image, SUPPORTED_EX
 class KVGrainyGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("KVGrainy - Image Optimizer")
+        self.root.title("KVGrainy - Image Right Sizer")
         self.root.geometry("700x600")
         self.root.resizable(True, True)
         
@@ -22,8 +22,12 @@ class KVGrainyGUI:
     
     def setup_ui(self):
         # Title
-        title = ttk.Label(self.root, text="KVGrainy Image Optimizer", font=("Arial", 16, "bold"))
+        title = ttk.Label(self.root, text="KVGrainy Image Right Sizer", font=("Arial", 16, "bold"))
         title.pack(pady=10)
+        
+        # Subtitle
+        subtitle = ttk.Label(self.root, text="Making Your Images More Grainy", font=("Arial", 10, "italic"))
+        subtitle.pack(pady=(0, 15))
         
         # Input Paths Frame
         paths_frame = ttk.LabelFrame(self.root, text="Input Images", padding=10)

@@ -15,6 +15,26 @@ SCALE_WEIGHT_BASE = 0.85
 SCALE_WEIGHT_RANGE = 0.15
 
 
+def print_banner() -> None:
+    """Print a colorful startup banner."""
+    # ANSI color codes
+    BOLD = "\033[1m"
+    CYAN = "\033[96m"
+    MAGENTA = "\033[95m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RESET = "\033[0m"
+    
+    print()
+    print(f"{CYAN}{'-'*60}{RESET}")
+    print(f"{MAGENTA}|{RESET}")
+    print(f"{MAGENTA}|{RESET} {BOLD}{GREEN}KVGrainy Image Right Sizer{RESET}")
+    print(f"{MAGENTA}|{RESET} {YELLOW}Making Your Images More Grainy{RESET}")
+    print(f"{MAGENTA}|{RESET}")
+    print(f"{CYAN}{'-'*60}{RESET}")
+    print()
+
+
 @dataclass
 class Candidate:
     image_bytes: bytes
@@ -190,6 +210,8 @@ def interactive_inputs() -> tuple[list[str], str, str, str | None]:
 
 
 def main() -> None:
+    print_banner()
+    
     parser = argparse.ArgumentParser(description="Automated local image reducer that maximizes quality under a size limit.")
     parser.add_argument("paths", nargs="*", help="Image files and/or folders")
     parser.add_argument("--limit", help="Max output size per image (e.g. 500kb, 1.5mb)")
