@@ -12,6 +12,12 @@ class KVGrainyTests(unittest.TestCase):
         self.assertEqual(parse_size_limit("500kb"), 500 * 1024)
         self.assertEqual(parse_size_limit("1.5mb"), int(1.5 * 1024 * 1024))
         self.assertEqual(parse_size_limit("2048"), 2048)
+        with self.assertRaises(ValueError):
+            parse_size_limit("")
+        with self.assertRaises(ValueError):
+            parse_size_limit("abc")
+        with self.assertRaises(ValueError):
+            parse_size_limit("-10kb")
 
     def test_iter_images_from_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

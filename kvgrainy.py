@@ -9,6 +9,10 @@ from PIL import Image, ImageChops
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
 SCALE_FACTORS = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3]
+VISUAL_WEIGHT = 0.8
+SIZE_UTILIZATION_WEIGHT = 0.2
+SCALE_WEIGHT_BASE = 0.85
+SCALE_WEIGHT_RANGE = 0.15
 
 
 @dataclass
@@ -36,8 +40,14 @@ def parse_size_limit(text: str) -> int:
     for unit, multiplier in units:
         if value.endswith(unit):
             number = value[: -len(unit)].strip()
-            return int(float(number) * multiplier)
-    return int(float(value))
+            parsed = int(float(number) * multiplier)
+            if parsed <= 0:
+                raise ValueError("Size limit must be greater than zero")
+            return parsed
+    parsed = int(float(value))
+    if parsed <= 0:
+        raise ValueError("Size limit must be greater than zero")
+    return parsed
 
 
 def iter_images(paths: Iterable[str]) -> list[Path]:
@@ -75,7 +85,7 @@ def rms_score(original: Image.Image, candidate: Image.Image, scale: float) -> fl
     sum_of_squares = sum(sq)
     rms = math.sqrt(sum_of_squares / float(original.size[0] * original.size[1] * 3))
     similarity = max(0.0, 1.0 - (rms / 255.0))
-    return similarity * (0.85 + (0.15 * scale))
+    return similarity * (SCALE_WEIGHT_BASE + (SCALE_WEIGHT_RANGE * scale))
 
 
 def get_working_image(image: Image.Image, fmt: str) -> Image.Image:
@@ -106,7 +116,7 @@ def evaluate_candidate(
     scale = resized.width / original.width
     visual = rms_score(original_rgb, decoded, scale)
     utilization = size / limit_bytes
-    total_score = (visual * 0.8) + (utilization * 0.2)
+    total_score = (visual * VISUAL_WEIGHT) + (utilization * SIZE_UTILIZATION_WEIGHT)
     return Candidate(payload, fmt, quality, scale, size, visual, total_score)
 
 
