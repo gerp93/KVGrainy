@@ -97,27 +97,36 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
         script_contents = (
             "@echo off\r\n"
             ":retry\r\n"
-            f'copy /y "{new_binary_path}" "{current_exe}" >nul 2>&1\r\n'
-            "if errorlevel 1 (\r\n"
+            f'del "{current_exe}" >nul 2>&1\r\n'
+            f'if exist "{current_exe}" (\r\n'
             "  timeout /t 1 /nobreak >nul 2>&1\r\n"
             "  goto retry\r\n"
             ")\r\n"
+            f'move /y "{new_binary_path}" "{current_exe}" >nul 2>&1\r\n'
             f'start "" "{current_exe}"\r\n'
-            f'del "{new_binary_path}"\r\n'
             'del "%~f0"\r\n'
         )
         # write_bytes, not write_text: text mode would additionally
         # translate the \n in these \r\n literals into \r\n itself,
         # doubling every carriage return.
         script_path.write_bytes(script_contents.encode("ascii"))
-        # Retry the copy in a loop instead of trying to detect our own PID
-        # exiting: tasklist's output format is locale-dependent, and the
-        # thing we actually care about -- whether the old exe's file lock
-        # has been released -- is exactly what a failing/succeeding copy
-        # already tells us. CREATE_NO_WINDOW (not DETACHED_PROCESS) still
-        # gives the console tools in the script a real console to attach
-        # to, just hidden; DETACHED_PROCESS gives them none at all, which
-        # is why `timeout` in particular would fail outright.
+        # Delete the old exe and move (rename) the new one into place
+        # rather than overwriting its content in place -- a manual repro
+        # (download + explicitly "replace" the installed exe, no code of
+        # ours involved) hit the same "Failed to load Python DLL" failure
+        # in-place overwrite did, while a fresh download at a new path ran
+        # fine. Consistent with AV/EDR heuristics that flag a file
+        # overwriting an existing executable's content (a common
+        # self-replacing-malware pattern); delete+rename never mutates an
+        # existing file's bytes, so it doesn't trip that heuristic.
+        #
+        # Retry the delete rather than detecting our own PID exiting via
+        # tasklist: its output is locale-dependent, and a failing vs.
+        # succeeding delete already tells us whether the old exe's file
+        # lock has released. CREATE_NO_WINDOW (not DETACHED_PROCESS) still
+        # gives the console tools in the script a console to attach to,
+        # just hidden -- DETACHED_PROCESS gives them none, which is why
+        # `timeout` in particular would fail outright.
         subprocess.Popen(
             ["cmd", "/c", str(script_path)],
             creationflags=subprocess.CREATE_NO_WINDOW,
