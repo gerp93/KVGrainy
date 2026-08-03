@@ -128,6 +128,7 @@ bundling `LICENSE` via `--add-data` before each build. Then `release`
 collects all three artifacts and cuts a GitHub Release tagged with the
 version job's output.
 
+
 Because the version bump scans every commit in a push, a merge that bundles
 an unrelated `feat:` commit alongside a `chore:`/`fix:` one will bump minor
 even if the PR's main intent was patch-level — keep PRs to one conventional
