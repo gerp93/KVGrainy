@@ -93,11 +93,15 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
     current_exe = Path(sys.executable).resolve()
 
     if platform.system() == "Windows":
-        # TEMPORARY DEBUG BUILD: runs visibly and stays open (pause) instead
-        # of hidden + self-deleting, and doesn't suppress command output, so
-        # the actual del/move/start errors are visible instead of guessed
-        # at. Revert to a hidden CREATE_NO_WINDOW + self-deleting script
-        # once the real failure is identified.
+        # TEMPORARY DEBUG BUILD: still runs visibly (pause, unsuppressed
+        # output) for one more confirmation round. The previous debug run
+        # proved del/move/timeout all succeed -- move reported "1 file(s)
+        # moved." and the file is complete and correctly placed on disk --
+        # yet `start "" exe` (CreateProcess, via cmd's builtin) still fails
+        # to load python311.dll, while a manual double-click of that exact
+        # file (ShellExecute, via Explorer) always works. Routing the
+        # relaunch through explorer.exe instead of `start` to go through
+        # the same shell code path a manual double-click uses.
         script_path = new_binary_path.parent / "kvgrainy_update.bat"
         script_contents = (
             "@echo on\r\n"
@@ -112,7 +116,7 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
             ")\r\n"
             f'move /y "{new_binary_path}" "{current_exe}"\r\n'
             "timeout /t 2 /nobreak\r\n"
-            f'start "" "{current_exe}"\r\n'
+            f'explorer.exe "{current_exe}"\r\n'
             "echo done -- check whether KVGrainy opened above.\r\n"
             "pause\r\n"
         )
