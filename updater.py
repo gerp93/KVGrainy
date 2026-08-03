@@ -112,7 +112,11 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
             ["cmd", "/c", str(script_path)],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
-        sys.exit(0)
+        # sys.exit() raises SystemExit, which a Tkinter callback (this runs
+        # from one, via root.after) silently swallows instead of letting it
+        # terminate the process -- the batch script's wait-for-exit loop
+        # would then spin forever. os._exit() kills the process outright.
+        os._exit(0)
     else:
         import shutil
 
