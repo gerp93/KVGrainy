@@ -25,6 +25,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
           release_branches: main
+          # TEMPORARY: force this one release to 1.0.0. Remove this line
+          # in the very next commit so future pushes resume normal
+          # Conventional-Commits-driven auto-bumping from v1.0.0 onward.
+          custom_tag: "1.0.0"
 
   build:
     needs: version
