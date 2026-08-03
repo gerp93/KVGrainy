@@ -103,6 +103,7 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
             "  goto retry\r\n"
             ")\r\n"
             f'move /y "{new_binary_path}" "{current_exe}" >nul 2>&1\r\n'
+            "timeout /t 2 /nobreak >nul 2>&1\r\n"
             f'start "" "{current_exe}"\r\n'
             'del "%~f0"\r\n'
         )
@@ -111,14 +112,18 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
         # doubling every carriage return.
         script_path.write_bytes(script_contents.encode("ascii"))
         # Delete the old exe and move (rename) the new one into place
-        # rather than overwriting its content in place -- a manual repro
-        # (download + explicitly "replace" the installed exe, no code of
-        # ours involved) hit the same "Failed to load Python DLL" failure
-        # in-place overwrite did, while a fresh download at a new path ran
-        # fine. Consistent with AV/EDR heuristics that flag a file
-        # overwriting an existing executable's content (a common
-        # self-replacing-malware pattern); delete+rename never mutates an
-        # existing file's bytes, so it doesn't trip that heuristic.
+        # rather than overwriting its content in place. This alone did NOT
+        # fix a "Failed to load Python DLL" PyInstaller bootloader failure
+        # seen right after relaunch -- confirmed (by launching the same,
+        # already-replaced exe manually a moment later, which worked fine)
+        # to be a timing race, not a broken file or an overwrite-pattern
+        # AV/EDR flag: something (most likely real-time AV scanning the
+        # freshly written exe) still had it briefly locked/held at the
+        # instant we tried to launch it. The `timeout /t 2` below the move
+        # gives that a moment to clear before `start` runs. Delete+move is
+        # kept anyway since it's still the more correct primitive (never
+        # mutates an existing file's bytes), even though it wasn't the fix
+        # for this particular failure.
         #
         # Retry the delete rather than detecting our own PID exiting via
         # tasklist: its output is locale-dependent, and a failing vs.
