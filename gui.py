@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from tkinter.scrolledtext import ScrolledText
 from pathlib import Path
 from threading import Thread
 import os
@@ -17,6 +18,13 @@ from kvgrainy import (
 )
 from updater import CURRENT_VERSION, check_for_update, download_update, apply_update_and_restart
 import theming
+
+def resource_path(relative_path: str) -> Path:
+    """Resolve a path to a bundled resource, whether running from source or
+    as a frozen PyInstaller build (which extracts data files to _MEIPASS)."""
+    base_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base_path / relative_path
+
 
 PRIORITY_LABELS = {
     "Prioritize dropping frames (keep colors & detail)": "frames",
@@ -58,6 +66,7 @@ class KVGrainyGUI:
 
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="Check for Updates...", command=lambda: self.check_for_updates(manual=True))
+        help_menu.add_command(label="License...", command=self.show_license)
         help_menu.add_separator()
         help_menu.add_command(label=f"Version {CURRENT_VERSION}", state=tk.DISABLED)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -67,6 +76,24 @@ class KVGrainyGUI:
 
     def on_theme_selected(self, theme_id):
         theming.apply_theme(self.root, theme_id)
+
+    def show_license(self):
+        try:
+            license_text = resource_path("LICENSE").read_text(encoding="utf-8")
+        except OSError as e:
+            messagebox.showerror("License", f"Could not read the LICENSE file: {e}")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("KVGrainy License - GNU AGPL-3.0")
+        window.geometry("700x600")
+
+        text = ScrolledText(window, wrap=tk.WORD)
+        text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        text.insert("1.0", license_text)
+        text.config(state=tk.DISABLED)
+
+        ttk.Button(window, text="Close", command=window.destroy).pack(pady=(0, 10))
 
     def check_for_updates(self, manual: bool):
         Thread(target=self._check_for_updates_worker, args=(manual,), daemon=True).start()
