@@ -93,40 +93,35 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
     current_exe = Path(sys.executable).resolve()
 
     if platform.system() == "Windows":
-        # TEMPORARY DEBUG BUILD: still runs visibly (pause, unsuppressed
-        # output) for one more confirmation round. The previous debug run
-        # proved del/move/timeout all succeed -- move reported "1 file(s)
-        # moved." and the file is complete and correctly placed on disk --
-        # yet `start "" exe` (CreateProcess, via cmd's builtin) still fails
-        # to load python311.dll, while a manual double-click of that exact
-        # file (ShellExecute, via Explorer) always works. Routing the
-        # relaunch through explorer.exe instead of `start` to go through
-        # the same shell code path a manual double-click uses.
         script_path = new_binary_path.parent / "kvgrainy_update.bat"
         script_contents = (
-            "@echo on\r\n"
-            f'echo current_exe={current_exe}\r\n'
-            f'echo new_binary_path={new_binary_path}\r\n'
+            "@echo off\r\n"
             ":retry\r\n"
-            f'del "{current_exe}"\r\n'
+            f'del "{current_exe}" >nul 2>&1\r\n'
             f'if exist "{current_exe}" (\r\n'
-            "  echo old exe still present, retrying delete...\r\n"
-            "  timeout /t 1 /nobreak\r\n"
+            "  timeout /t 1 /nobreak >nul 2>&1\r\n"
             "  goto retry\r\n"
             ")\r\n"
-            f'move /y "{new_binary_path}" "{current_exe}"\r\n'
-            "timeout /t 2 /nobreak\r\n"
+            f'move /y "{new_binary_path}" "{current_exe}" >nul 2>&1\r\n'
+            "timeout /t 2 /nobreak >nul 2>&1\r\n"
             f'explorer.exe "{current_exe}"\r\n'
-            "echo done -- check whether KVGrainy opened above.\r\n"
-            "pause\r\n"
+            'del "%~f0"\r\n'
         )
         # write_bytes, not write_text: text mode would additionally
         # translate the \n in these \r\n literals into \r\n itself,
         # doubling every carriage return.
         script_path.write_bytes(script_contents.encode("ascii"))
+        # Confirmed via a visible debug build: del/move/timeout all work
+        # fine (move reports "1 file(s) moved." and the file is complete
+        # and correctly placed on disk by the time we'd try to launch it),
+        # but launching via `start` (CreateProcess, through cmd's builtin)
+        # reliably failed to load python311.dll, while a manual
+        # double-click of that exact file (ShellExecute, through Explorer)
+        # always worked. explorer.exe here routes the relaunch through the
+        # same shell code path the working manual case uses.
         subprocess.Popen(
-            ["cmd", "/k", str(script_path)],
-            creationflags=subprocess.CREATE_NEW_CONSOLE,
+            ["cmd", "/c", str(script_path)],
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         # sys.exit() raises SystemExit, which a Tkinter callback (this runs
         # from one, via root.after) silently swallows instead of letting it
