@@ -6,6 +6,7 @@ import sys
 import io
 import time
 from kvgrainy import iter_images, parse_size_limit, optimize_image, SUPPORTED_EXTENSIONS
+from updater import CURRENT_VERSION, check_for_update, download_update, apply_update_and_restart
 
 
 class KVGrainyGUI:
@@ -14,12 +15,58 @@ class KVGrainyGUI:
         self.root.title("KVGrainy - Image Right Sizer")
         self.root.geometry("700x600")
         self.root.resizable(True, True)
-        
+
         self.paths = []
         self.processing = False
-        
+
         self.setup_ui()
-    
+        self.setup_menu()
+        self.root.after(1500, lambda: self.check_for_updates(manual=False))
+
+    def setup_menu(self):
+        menubar = tk.Menu(self.root)
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Check for Updates...", command=lambda: self.check_for_updates(manual=True))
+        help_menu.add_separator()
+        help_menu.add_command(label=f"Version {CURRENT_VERSION}", state=tk.DISABLED)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        self.root.config(menu=menubar)
+
+    def check_for_updates(self, manual: bool):
+        Thread(target=self._check_for_updates_worker, args=(manual,), daemon=True).start()
+
+    def _check_for_updates_worker(self, manual: bool):
+        update = check_for_update()
+
+        def show():
+            if update:
+                self.prompt_update(update)
+            elif manual:
+                messagebox.showinfo("Up to Date", f"You're running the latest version ({CURRENT_VERSION}).")
+
+        self.root.after(0, show)
+
+    def prompt_update(self, update):
+        if not messagebox.askyesno(
+            "Update Available",
+            f"Version {update['version']} is available (you have {CURRENT_VERSION}).\n\n"
+            "Download and install it now? KVGrainy will restart automatically.",
+        ):
+            return
+        Thread(target=self._download_and_apply_update, args=(update,), daemon=True).start()
+
+    def _download_and_apply_update(self, update):
+        try:
+            new_binary = download_update(update["download_url"])
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror("Update Failed", f"Could not download update: {e}"))
+            return
+        self.root.after(0, lambda: self._finish_update(new_binary))
+
+    def _finish_update(self, new_binary):
+        messagebox.showinfo("Restarting", "KVGrainy will now restart to complete the update.")
+        apply_update_and_restart(new_binary)
+
     def setup_ui(self):
         # Title
         title = ttk.Label(self.root, text="KVGrainy Image Right Sizer", font=("Arial", 16, "bold"))
