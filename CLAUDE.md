@@ -132,3 +132,5 @@ Because the version bump scans every commit in a push, a merge that bundles
 an unrelated `feat:` commit alongside a `chore:`/`fix:` one will bump minor
 even if the PR's main intent was patch-level — keep PRs to one conventional
 commit type where the version bump matters, or squash-merge.
+
+
