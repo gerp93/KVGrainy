@@ -70,7 +70,13 @@ jobs:
       - name: Build executable
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --onefile --windowed --name KVGrainy gui.py
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            SEP=";"
+          else
+            SEP=":"
+          fi
+          python -m PyInstaller --noconfirm --onefile --windowed --name KVGrainy \
+            --add-data "LICENSE${SEP}." gui.py
 
       - name: Stage artifact
         shell: bash
