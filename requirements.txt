@@ -1,1 +1,2 @@
 Pillow>=10.0.0
+visual-assault-tkinter @ git+https://github.com/gerp93/VisualAssault.git@main#subdirectory=packages/tkinter

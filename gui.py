@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from threading import Thread
+import os
+import subprocess
 import sys
 import io
 import time
@@ -14,6 +16,7 @@ from kvgrainy import (
     GifTuner,
 )
 from updater import CURRENT_VERSION, check_for_update, download_update, apply_update_and_restart
+import theming
 
 PRIORITY_LABELS = {
     "Prioritize dropping frames (keep colors & detail)": "frames",
@@ -26,7 +29,7 @@ class KVGrainyGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("KVGrainy - Image Right Sizer")
-        self.root.geometry("760x680")
+        self.root.geometry("760x820")
         self.root.resizable(True, True)
 
         self.paths = []
@@ -38,12 +41,32 @@ class KVGrainyGUI:
 
     def setup_menu(self):
         menubar = tk.Menu(self.root)
+
+        self.theme_var = tk.StringVar(value="__default__")
+        theme_menu = tk.Menu(menubar, tearoff=0)
+        theme_menu.add_radiobutton(
+            label=theming.DEFAULT_LABEL, variable=self.theme_var,
+            value="__default__", command=lambda: self.on_theme_selected(None),
+        )
+        theme_menu.add_separator()
+        for theme_id, name in theming.THEME_NAMES.items():
+            theme_menu.add_radiobutton(
+                label=name, variable=self.theme_var,
+                value=theme_id, command=lambda tid=theme_id: self.on_theme_selected(tid),
+            )
+        menubar.add_cascade(label="Theme", menu=theme_menu)
+
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="Check for Updates...", command=lambda: self.check_for_updates(manual=True))
         help_menu.add_separator()
         help_menu.add_command(label=f"Version {CURRENT_VERSION}", state=tk.DISABLED)
         menubar.add_cascade(label="Help", menu=help_menu)
+
         self.root.config(menu=menubar)
+        theming.capture_defaults(self.root)
+
+    def on_theme_selected(self, theme_id):
+        theming.apply_theme(self.root, theme_id)
 
     def check_for_updates(self, manual: bool):
         Thread(target=self._check_for_updates_worker, args=(manual,), daemon=True).start()
@@ -144,6 +167,7 @@ class KVGrainyGUI:
         output_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         
         ttk.Button(output_frame, text="Browse", command=self.select_output).pack(side=tk.LEFT)
+        ttk.Button(output_frame, text="Open Folder", command=self.open_output_folder).pack(side=tk.LEFT, padx=(5, 0))
         
         # Progress Frame
         progress_frame = ttk.LabelFrame(root, text="Progress", padding=10)
@@ -456,7 +480,18 @@ class KVGrainyGUI:
         folder = filedialog.askdirectory(title="Select Output Folder")
         if folder:
             self.output_var.set(folder)
-    
+
+    def open_output_folder(self):
+        folder = Path(self.output_var.get()).expanduser().resolve()
+        folder.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(folder)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(folder)])
+        else:
+            subprocess.Popen(["xdg-open", str(folder)])
+
+
     def log(self, message):
         self.progress_text.config(state=tk.NORMAL)
         self.progress_text.insert(tk.END, message + "\n")
