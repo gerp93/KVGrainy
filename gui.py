@@ -59,7 +59,7 @@ class KVGrainyGUI:
         ttk.Label(limit_frame, text="Output Format:").grid(row=1, column=0, sticky="w", pady=5)
         self.format_var = tk.StringVar(value="auto")
         format_combo = ttk.Combobox(limit_frame, textvariable=self.format_var, 
-                                    values=["auto", "jpeg", "png", "webp"], 
+                                    values=["auto", "jpeg", "png", "webp", "gif"],
                                     state="readonly", width=17)
         format_combo.grid(row=1, column=1, sticky="w", padx=5)
         
