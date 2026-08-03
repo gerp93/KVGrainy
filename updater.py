@@ -93,24 +93,34 @@ def apply_update_and_restart(new_binary_path: Path) -> None:
     current_exe = Path(sys.executable).resolve()
 
     if platform.system() == "Windows":
-        pid = os.getpid()
         script_path = new_binary_path.parent / "kvgrainy_update.bat"
-        script_path.write_text(
+        script_contents = (
             "@echo off\r\n"
-            ":wait\r\n"
-            f'tasklist /FI "PID eq {pid}" 2^>nul | find "{pid}" >nul\r\n'
-            "if not errorlevel 1 (\r\n"
-            "  timeout /t 1 /nobreak >nul\r\n"
-            "  goto wait\r\n"
+            ":retry\r\n"
+            f'copy /y "{new_binary_path}" "{current_exe}" >nul 2>&1\r\n'
+            "if errorlevel 1 (\r\n"
+            "  timeout /t 1 /nobreak >nul 2>&1\r\n"
+            "  goto retry\r\n"
             ")\r\n"
-            f'copy /y "{new_binary_path}" "{current_exe}" >nul\r\n'
             f'start "" "{current_exe}"\r\n'
             f'del "{new_binary_path}"\r\n'
             'del "%~f0"\r\n'
         )
+        # write_bytes, not write_text: text mode would additionally
+        # translate the \n in these \r\n literals into \r\n itself,
+        # doubling every carriage return.
+        script_path.write_bytes(script_contents.encode("ascii"))
+        # Retry the copy in a loop instead of trying to detect our own PID
+        # exiting: tasklist's output format is locale-dependent, and the
+        # thing we actually care about -- whether the old exe's file lock
+        # has been released -- is exactly what a failing/succeeding copy
+        # already tells us. CREATE_NO_WINDOW (not DETACHED_PROCESS) still
+        # gives the console tools in the script a real console to attach
+        # to, just hidden; DETACHED_PROCESS gives them none at all, which
+        # is why `timeout` in particular would fail outright.
         subprocess.Popen(
             ["cmd", "/c", str(script_path)],
-            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         # sys.exit() raises SystemExit, which a Tkinter callback (this runs
         # from one, via root.after) silently swallows instead of letting it
