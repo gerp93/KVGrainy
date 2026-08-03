@@ -243,6 +243,91 @@ def find_best_gif(original: Image.Image, limit_bytes: int) -> Candidate | None:
     return best
 
 
+GIF_COLOR_STEPS = [256, 220, 180, 140, 110, 90, 70, 55, 45, 35, 28, 22, 17, 13, 10, 8, 6, 4, 2]
+GIF_FRAME_STEPS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20]
+
+
+@dataclass
+class GifConfig:
+    scale: float
+    colors: int
+    frame_step: int
+
+
+def build_gif_ladder(priority: str) -> list[GifConfig]:
+    """Order configs from best (index 0) to worst, degrading `priority` first."""
+    axis_steps = {"resolution": SCALE_FACTORS, "colors": GIF_COLOR_STEPS, "frames": GIF_FRAME_STEPS}
+    secondary_order = {
+        "frames": ["frames", "colors", "resolution"],
+        "colors": ["colors", "frames", "resolution"],
+        "resolution": ["resolution", "colors", "frames"],
+    }[priority]
+
+    current = {"resolution": SCALE_FACTORS[0], "colors": GIF_COLOR_STEPS[0], "frames": GIF_FRAME_STEPS[0]}
+    ladder = [GifConfig(scale=current["resolution"], colors=current["colors"], frame_step=current["frames"])]
+    for axis in secondary_order:
+        for value in axis_steps[axis][1:]:
+            current[axis] = value
+            ladder.append(GifConfig(scale=current["resolution"], colors=current["colors"], frame_step=current["frames"]))
+    return ladder
+
+
+def apply_frame_step(
+    frames: list[Image.Image], durations: list[int], step: int
+) -> tuple[list[Image.Image], list[int]]:
+    if step <= 1:
+        return frames, durations
+    kept_frames = []
+    kept_durations = []
+    for i in range(0, len(frames), step):
+        kept_frames.append(frames[i])
+        kept_durations.append(sum(durations[i : i + step]))
+    return kept_frames, kept_durations
+
+
+def encode_gif_config(
+    frames: list[Image.Image], durations: list[int], loop: int, config: GifConfig
+) -> bytes:
+    stepped_frames, stepped_durations = apply_frame_step(frames, durations, config.frame_step)
+    if config.scale != 1.0:
+        width = max(1, int(stepped_frames[0].width * config.scale))
+        height = max(1, int(stepped_frames[0].height * config.scale))
+        stepped_frames = [f.resize((width, height), Image.Resampling.LANCZOS) for f in stepped_frames]
+    return encode_gif(stepped_frames, stepped_durations, loop, config.colors)
+
+
+class GifTuner:
+    """Caches ladder encodes for interactive fine-tuning of a single animated GIF."""
+
+    def __init__(self, image_path: Path):
+        self.image_path = image_path
+        original = Image.open(image_path)
+        self.frames, self.durations, self.loop = load_gif_frames(original)
+        self.original_size = self.frames[0].size
+        self.frame_count = len(self.frames)
+        self._ladders: dict[str, list[GifConfig]] = {}
+        self._cache: dict[tuple[str, int], bytes] = {}
+
+    def ladder(self, priority: str) -> list[GifConfig]:
+        if priority not in self._ladders:
+            self._ladders[priority] = build_gif_ladder(priority)
+        return self._ladders[priority]
+
+    def encode(self, priority: str, index: int) -> bytes:
+        key = (priority, index)
+        if key not in self._cache:
+            config = self.ladder(priority)[index]
+            self._cache[key] = encode_gif_config(self.frames, self.durations, self.loop, config)
+        return self._cache[key]
+
+    def max_feasible_index(self, priority: str, limit_bytes: int) -> int:
+        ladder = self.ladder(priority)
+        for index in range(len(ladder)):
+            if len(self.encode(priority, index)) <= limit_bytes:
+                return index
+        return len(ladder) - 1
+
+
 def optimize_animated_gif(image_path: Path, limit_bytes: int, output_dir: Path, original: Image.Image) -> Candidate:
     best = find_best_gif(original, limit_bytes)
     if not best:
