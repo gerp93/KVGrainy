@@ -28,8 +28,12 @@ python -m py_compile gui.py kvgrainy.py updater.py theming.py
 There is no linter or formatter configured in this repo.
 
 `requirements.txt` installs `visual-assault-tkinter` directly from a GitHub
-subdirectory (`git+https://github.com/gerp93/VisualAssault.git@main#subdirectory=packages/tkinter`) —
-there is no PyPI package for it.
+subdirectory, pinned to a released tag (per
+[KVG_Standards/themes-versioning.md](https://github.com/gerp93/KVG_Standards/blob/main/themes-versioning.md) —
+never `@main`):
+`git+https://github.com/gerp93/VisualAssault.git@v0.2.0#subdirectory=packages/tkinter`.
+There is no PyPI package for it. Bumping the pinned version is a one-line,
+standalone commit — see that doc.
 
 ## Architecture
 
@@ -115,30 +119,18 @@ callback (`root.after`) — Tkinter's callback exception handler silently
 swallows the resulting `SystemExit`, so the process never actually dies and
 the batch script's wait loop spins forever. Use `os._exit()` there instead.
 
-### Release pipeline (`.github/workflows/release.yml`)
+### Release pipeline (`.github/workflows/cut-release.yml`)
 
-Every push to `main` runs three jobs in sequence: `version` bumps semver
-using `mathieudutour/github-tag-action`, which follows the Conventional
-Commits / Angular convention across **every commit in the push, not just
-one**, taking the highest-severity prefix found (`BREAKING CHANGE` footer >
-`feat:` > `fix:`; anything else falls back to `default_bump: patch`). Then
-`build` runs a PyInstaller `--onefile --windowed` matrix across Linux,
-Windows, and macOS, writing `_version.py` (consumed by `updater.py`) and
-bundling `LICENSE` via `--add-data` before each build. Then `release`
-collects all three artifacts and cuts a GitHub Release tagged with the
-version job's output.
-
-Because the version bump scans every commit in a push, a merge that bundles
-an unrelated `feat:` commit alongside a `chore:`/`fix:` one will bump minor
-even if the PR's main intent was patch-level — keep PRs to one conventional
-commit type where the version bump matters, or squash-merge.
-
-
-
-
-
-
-
-
-
-
+Releases are cut manually via the "Cut Release" workflow in the Actions tab
+(`workflow_dispatch`, an explicit `vX.Y.Z` input) rather than firing
+automatically on every push to `main` — replacing the old conventional-commit
+auto-bump. The `tag` job validates the version and pushes the git tag; the
+`release` job then calls
+[`gerp93/KVG_Standards`](https://github.com/gerp93/KVG_Standards)'s
+`release-python-gui.yml` reusable workflow, which runs the PyInstaller
+`--onefile --windowed` matrix across Linux, Windows, and macOS (writing
+`_version.py`, consumed by `updater.py`, and bundling `LICENSE` via
+`--add-data`), then collects all three artifacts and cuts a GitHub Release
+tagged with that version. See KVG_Standards' `README.md` for the shared
+workflow catalog — the build/release logic itself lives there now, not in
+this repo.
