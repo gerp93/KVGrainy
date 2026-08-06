@@ -2,7 +2,7 @@
   <img src="assets/readme-header.png" alt="KVGrainy logo" width="200" />
 </p>
 
-# KVGrainy - "Make Your Images More Grainy"
+# KVGrainy 
 
 KVGrainy is a local-first image optimizer that automatically reduces images to the
 largest possible file size under a limit while keeping them visually strong.
