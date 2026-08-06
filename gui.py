@@ -43,9 +43,15 @@ class KVGrainyGUI:
         self.paths = []
         self.processing = False
 
+        self.setup_icon()
         self.setup_ui()
         self.setup_menu()
         self.root.after(1500, lambda: self.check_for_updates(manual=False))
+
+    def setup_icon(self):
+        # Kept on self so Tkinter doesn't garbage-collect the PhotoImage.
+        self._icon_image = ImageTk.PhotoImage(Image.open(resource_path("assets/icon.png")))
+        self.root.iconphoto(True, self._icon_image)
 
     def setup_menu(self):
         menubar = tk.Menu(self.root)
@@ -143,13 +149,23 @@ class KVGrainyGUI:
         self.setup_finetune_tab(finetune_tab)
 
     def setup_bulk_tab(self, root):
-        # Title
-        title = ttk.Label(root, text="KVGrainy Image Right Sizer", font=("Arial", 16, "bold"))
-        title.pack(pady=10)
+        # Header: logo + title/subtitle
+        header = ttk.Frame(root)
+        header.pack(pady=10)
 
-        # Subtitle
-        subtitle = ttk.Label(root, text="Making Your Images More Grainy", font=("Arial", 10, "italic"))
-        subtitle.pack(pady=(0, 15))
+        self._header_logo = ImageTk.PhotoImage(
+            Image.open(resource_path("assets/icon.png")).resize((40, 40), Image.LANCZOS)
+        )
+        ttk.Label(header, image=self._header_logo).pack(side=tk.LEFT, padx=(0, 10))
+
+        text_col = ttk.Frame(header)
+        text_col.pack(side=tk.LEFT)
+
+        title = ttk.Label(text_col, text="KVGrainy Image Right Sizer", font=("Arial", 16, "bold"))
+        title.pack(anchor="w")
+
+        subtitle = ttk.Label(text_col, text="Making Your Images More Grainy", font=("Arial", 10, "italic"))
+        subtitle.pack(anchor="w")
 
         # Input Paths Frame
         paths_frame = ttk.LabelFrame(root, text="Input Images", padding=10)

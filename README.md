@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/readme-header.png" alt="KVGrainy logo" width="200" />
+</p>
+
 # KVGrainy - "Make Your Images More Grainy"
 
 KVGrainy is a local-first image optimizer that automatically reduces images to the

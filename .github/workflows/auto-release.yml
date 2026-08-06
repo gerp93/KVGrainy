@@ -40,5 +40,7 @@ jobs:
       entry_point: gui.py
       windowed: true
       version_file: _version.py
+      extra_add_data: 'assets:assets'
+      icon_path: 'assets/icon'
     permissions:
       contents: write
