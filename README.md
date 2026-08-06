@@ -1,5 +1,7 @@
 # KVGrainy
 
+## Make Your Images More Grainy
+
 KVGrainy is a local-first image optimizer that automatically reduces images to the
 largest possible file size under a limit while keeping them visually strong.
 
