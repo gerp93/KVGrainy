@@ -119,21 +119,36 @@ callback (`root.after`) — Tkinter's callback exception handler silently
 swallows the resulting `SystemExit`, so the process never actually dies and
 the batch script's wait loop spins forever. Use `os._exit()` there instead.
 
-### Release pipeline (`.github/workflows/cut-release.yml`)
+### Release pipeline (`.github/workflows/auto-release.yml` + `cut-release.yml`)
 
-Releases are cut manually via the "Cut Release" workflow in the Actions tab
-(`workflow_dispatch`, an explicit `vX.Y.Z` input) rather than firing
-automatically on every push to `main` — replacing the old conventional-commit
-auto-bump. The `tag` job validates the version and pushes the git tag; the
-`release` job then calls
+Both release triggers are active, per KVG_Standards convention:
+`auto-release.yml` fires on every push to `main` (conventional-commit
+patch/minor/major bump, `default_bump: patch`), and `cut-release.yml` stays
+available in the Actions tab for a deliberately-numbered release
+(`workflow_dispatch`, explicit `vX.Y.Z` input) when you want one instead of
+the auto-bump. Both ultimately call
 [`gerp93/KVG_Standards`](https://github.com/gerp93/KVG_Standards)'s
 `release-python-gui.yml` reusable workflow, which runs the PyInstaller
 `--onefile --windowed` matrix across Linux, Windows, and macOS (writing
-`_version.py`, consumed by `updater.py`, and bundling `LICENSE` via
-`--add-data`), then collects all three artifacts and cuts a GitHub Release
-tagged with that version. See KVG_Standards' `README.md` for the shared
-workflow catalog — the build/release logic itself lives there now, not in
-this repo.
+`_version.py`, consumed by `updater.py`; bundling `LICENSE` and `assets/`
+via `--add-data`; embedding `assets/icon.ico`/`.icns` into the built
+executable via the `icon_path` input), then collects all three artifacts
+and cuts a GitHub Release tagged with that version — its body prepended
+with install instructions before the auto-generated changelog. See
+KVG_Standards' `README.md` for the shared workflow catalog — the
+build/release logic itself lives there now, not in this repo. To force a
+release with no other code change, edit `VERSION_BUMP.md` instead of
+pushing an empty commit — `auto-release.yml` bumps on every push
+regardless of content.
+
+## Standards
+
+This repo follows [gerp93/KVG_Standards](https://github.com/gerp93/KVG_Standards)
+for theming, release/CI, self-update, licensing, logo & branding, release
+notes, `VERSION_BUMP.md`, and `TODO.md` conventions. See that repo's
+`README.md` and `REPO_SCOPE.md` (KVGrainy's row) for the current standards
+and this repo's scope against them — don't assume this file has the full,
+current picture.
 
 
 
