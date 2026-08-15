@@ -5,9 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+import imageio
 from PIL import Image, ImageChops
 
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".gif"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".gif"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv"}
+SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+DEFAULT_VIDEO_FPS = 12
 SCALE_FACTORS = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3]
 VISUAL_WEIGHT = 0.8
 SIZE_UTILIZATION_WEIGHT = 0.2
@@ -185,6 +189,37 @@ def load_gif_frames(image: Image.Image) -> tuple[list[Image.Image], list[int], i
     return frames, durations, loop
 
 
+def load_video_frames(
+    video_path: Path,
+    fps: float | None = None,
+    start_time: float | None = None,
+    end_time: float | None = None,
+) -> tuple[list[Image.Image], list[int], int]:
+    target_fps = fps or DEFAULT_VIDEO_FPS
+    reader = imageio.get_reader(str(video_path), format="ffmpeg")
+    try:
+        source_fps = reader.get_meta_data().get("fps", 30) or 30
+        frame_step = max(1, round(source_fps / target_fps))
+        frames = []
+        for idx, frame in enumerate(reader):
+            t = idx / source_fps
+            if start_time is not None and t < start_time:
+                continue
+            if end_time is not None and t > end_time:
+                break
+            if idx % frame_step == 0:
+                frames.append(Image.fromarray(frame).convert("RGBA"))
+    finally:
+        reader.close()
+
+    if not frames:
+        raise RuntimeError(f"No frames could be read from {video_path.name}")
+
+    duration_ms = round(1000 / target_fps)
+    durations = [duration_ms] * len(frames)
+    return frames, durations, 0
+
+
 def encode_gif(frames: list[Image.Image], durations: list[int], loop: int, colors: int) -> bytes:
     buffer = io.BytesIO()
     quantized = [f.quantize(colors=colors, method=Image.Quantize.FASTOCTREE) for f in frames]
@@ -215,8 +250,9 @@ def gif_visual_score(original_frames: list[Image.Image], payload: bytes, scale: 
     return sum(scores) / len(scores)
 
 
-def find_best_gif(original: Image.Image, limit_bytes: int) -> Candidate | None:
-    frames, durations, loop = load_gif_frames(original)
+def find_best_gif(
+    frames: list[Image.Image], durations: list[int], loop: int, limit_bytes: int
+) -> Candidate | None:
     best: Candidate | None = None
     for scale in SCALE_FACTORS:
         width = max(1, int(frames[0].width * scale))
@@ -297,12 +333,21 @@ def encode_gif_config(
 
 
 class GifTuner:
-    """Caches ladder encodes for interactive fine-tuning of a single animated GIF."""
+    """Caches ladder encodes for interactive fine-tuning of a single animated GIF or video."""
 
-    def __init__(self, image_path: Path):
+    def __init__(
+        self,
+        image_path: Path,
+        fps: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ):
         self.image_path = image_path
-        original = Image.open(image_path)
-        self.frames, self.durations, self.loop = load_gif_frames(original)
+        if image_path.suffix.lower() in VIDEO_EXTENSIONS:
+            self.frames, self.durations, self.loop = load_video_frames(image_path, fps, start_time, end_time)
+        else:
+            original = Image.open(image_path)
+            self.frames, self.durations, self.loop = load_gif_frames(original)
         self.original_size = self.frames[0].size
         self.frame_count = len(self.frames)
         self._ladders: dict[str, list[GifConfig]] = {}
@@ -328,24 +373,44 @@ class GifTuner:
         return len(ladder) - 1
 
 
-def optimize_animated_gif(image_path: Path, limit_bytes: int, output_dir: Path, original: Image.Image) -> Candidate:
-    best = find_best_gif(original, limit_bytes)
+def optimize_frames(
+    source_path: Path,
+    limit_bytes: int,
+    output_dir: Path,
+    frames: list[Image.Image],
+    durations: list[int],
+    loop: int,
+) -> Candidate:
+    best = find_best_gif(frames, durations, loop, limit_bytes)
     if not best:
-        raise RuntimeError(f"Could not create output under limit for {image_path.name}")
+        raise RuntimeError(f"Could not create output under limit for {source_path.name}")
 
-    output_path = output_dir / f"{image_path.stem}_optimized.gif"
+    output_path = output_dir / f"{source_path.stem}_optimized.gif"
     output_path.write_bytes(best.image_bytes)
     print(
-        f"[done] {image_path.name} -> {output_path.name} | "
+        f"[done] {source_path.name} -> {output_path.name} | "
         f"{best.size_bytes / 1024:.1f}KB | fmt=GIF colors={best.quality} scale={best.scale:.2f}"
     )
     return best
 
 
-def optimize_image(image_path: Path, limit_bytes: int, output_dir: Path, format_override: str | None = None) -> Candidate:
+def optimize_image(
+    image_path: Path,
+    limit_bytes: int,
+    output_dir: Path,
+    format_override: str | None = None,
+    fps: float | None = None,
+    start_time: float | None = None,
+    end_time: float | None = None,
+) -> Candidate:
+    if image_path.suffix.lower() in VIDEO_EXTENSIONS:
+        frames, durations, loop = load_video_frames(image_path, fps, start_time, end_time)
+        return optimize_frames(image_path, limit_bytes, output_dir, frames, durations, loop)
+
     original = Image.open(image_path)
     if getattr(original, "is_animated", False):
-        return optimize_animated_gif(image_path, limit_bytes, output_dir, original)
+        frames, durations, loop = load_gif_frames(original)
+        return optimize_frames(image_path, limit_bytes, output_dir, frames, durations, loop)
     if format_override:
         formats = [format_override.upper()]
     else:
@@ -388,10 +453,13 @@ def main() -> None:
     print_banner()
     
     parser = argparse.ArgumentParser(description="Automated local image reducer that maximizes quality under a size limit.")
-    parser.add_argument("paths", nargs="*", help="Image files and/or folders")
+    parser.add_argument("paths", nargs="*", help="Image, GIF, and video files and/or folders")
     parser.add_argument("--limit", help="Max output size per image (e.g. 500kb, 1.5mb)")
     parser.add_argument("--output", default="./reduced", help="Output directory")
-    parser.add_argument("--format", help="Output format (jpeg, png, webp, gif). If not specified, auto-selects best format. Animated GIFs are always kept as optimized GIFs.")
+    parser.add_argument("--format", help="Output format (jpeg, png, webp, gif). If not specified, auto-selects best format. Animated GIFs and video inputs are always kept as optimized GIFs.")
+    parser.add_argument("--fps", type=float, help=f"Frames per second to sample video inputs at (default: {DEFAULT_VIDEO_FPS})")
+    parser.add_argument("--start", type=float, help="Start time in seconds for video inputs")
+    parser.add_argument("--end", type=float, help="End time in seconds for video inputs")
     args = parser.parse_args()
 
     paths = args.paths
@@ -412,11 +480,11 @@ def main() -> None:
     output_path.mkdir(parents=True, exist_ok=True)
 
     if fmt:
-        print(f"Processing {len(image_files)} image(s) with limit {limit_bytes} bytes (format: {fmt.upper()})")
+        print(f"Processing {len(image_files)} file(s) with limit {limit_bytes} bytes (format: {fmt.upper()})")
     else:
-        print(f"Processing {len(image_files)} image(s) with limit {limit_bytes} bytes")
+        print(f"Processing {len(image_files)} file(s) with limit {limit_bytes} bytes")
     for image in image_files:
-        optimize_image(image, limit_bytes, output_path, fmt)
+        optimize_image(image, limit_bytes, output_path, fmt, fps=args.fps, start_time=args.start, end_time=args.end)
     print("All images processed.")
 
 
