@@ -13,6 +13,7 @@ pip install -r requirements.txt
 # Run the CLI
 python kvgrainy.py [paths ...] --limit 750kb --output ./reduced [--format jpeg|png|webp|gif]
 python kvgrainy.py                     # no args -> interactive prompt mode
+python kvgrainy.py clip.mp4 --limit 2mb --fps 12 [--start 1.5] [--end 6]  # video input -> optimized .gif
 
 # Run the desktop GUI
 python gui.py
@@ -62,38 +63,51 @@ different knobs:
   (20–100) at each scale; PNG/GIF have no quality knob so every scale is
   just evaluated once. `rms_score()` measures visual similarity by
   re-decoding the candidate and diffing pixels against the original.
-- **Animated GIFs** (`optimize_animated_gif` → `find_best_gif`): detected via
-  `original.is_animated`, so a `.gif` upload isn't required — any animated
-  input hits this path, any static input hits the format search above. Same
-  scale loop, but binary-searches per-frame palette size (2–256 colors) at
-  each scale instead of quality, sampling up to 5 frames for the visual score
-  since scoring every frame would be too slow. This path always outputs
-  `.gif`; it never falls back to another format.
+- **Animated GIFs and video** (`optimize_image` → `optimize_frames` →
+  `find_best_gif`): any file with a video extension (`VIDEO_EXTENSIONS`:
+  `.mp4`/`.mov`/`.m4v`/`.avi`/`.mkv`) or any `.is_animated` PIL image hits
+  this path — the two source types are unified into the same
+  `(frames, durations, loop)` triple before the search even starts, via two
+  interchangeable loaders: `load_gif_frames()` decodes an already-open
+  animated `Image`, `load_video_frames()` decodes a video with `imageio`'s
+  ffmpeg reader, sampling down to `DEFAULT_VIDEO_FPS` (or `--fps`) and
+  optionally clipped by `--start`/`--end`. From there it's one search: same
+  scale loop as static images, but binary-searches per-frame palette size
+  (2–256 colors) at each scale instead of quality, sampling up to 5 frames
+  for the visual score since scoring every frame would be too slow. This
+  path always outputs `.gif`, whether the source was a GIF or a video; it
+  never falls back to another format. Video-specific resizing/FPS knobs are
+  deliberately *not* duplicated here — `SCALE_FACTORS` and the frame-drop
+  ladder below already own those axes, so a decoded video is just another
+  frame source feeding the one GIF-fitting engine.
 
 A third, separate mechanism — `build_gif_ladder()` / `GifTuner` — powers the
 GUI's manual "Fine-Tune GIF" tab and is not used by the automatic bulk-mode
-paths above. Instead of searching for one optimum, it builds a fixed,
-ordered list of configs (best → worst) across three independent axes —
-scale, color count, and frame-drop step (`apply_frame_step`, which keeps
-every Nth frame and sums the dropped frames' durations into the kept
-frame's, so playback speed doesn't change) — degrading whichever axis the
-user picked as `priority` first, before touching the other two. `GifTuner`
-caches encodes by `(priority, ladder index)` so scrubbing a slider in the
-GUI doesn't re-encode configs it's already computed. `max_feasible_index()`
-finds the best (lowest-index) config that still fits a size limit; the GUI
-maps its quality slider's 100% end to that index rather than to ladder
-index 0, so the slider always spans a fully-usable range regardless of how
-strict the limit is.
+paths above. `GifTuner` also accepts either a GIF or a video path (same
+loader dispatch as `optimize_image`). Instead of searching for one optimum,
+it builds a fixed, ordered list of configs (best → worst) across three
+independent axes — scale, color count, and frame-drop step
+(`apply_frame_step`, which keeps every Nth frame and sums the dropped
+frames' durations into the kept frame's, so playback speed doesn't change)
+— degrading whichever axis the user picked as `priority` first, before
+touching the other two. `GifTuner` caches encodes by `(priority, ladder
+index)` so scrubbing a slider in the GUI doesn't re-encode configs it's
+already computed. `max_feasible_index()` finds the best (lowest-index)
+config that still fits a size limit; the GUI maps its quality slider's 100%
+end to that index rather than to ladder index 0, so the slider always spans
+a fully-usable range regardless of how strict the limit is.
 
 ### GUI (`gui.py`)
 
 `KVGrainyGUI` builds a `ttk.Notebook` with two tabs, `setup_bulk_tab` (drives
-`kvgrainy.optimize_image` directly, one call per file) and
-`setup_finetune_tab` (drives `GifTuner` for one GIF at a time, live-previewing
-the animated result as the user adjusts limit/priority/quality). Every
-encode — bulk or fine-tune — runs on a background `Thread` and posts results
-back via `self.root.after(0, ...)`, since Tk is not thread-safe and must only
-be touched from the main thread.
+`kvgrainy.optimize_image` directly, one call per file — `SUPPORTED_EXTENSIONS`
+covers both images and video, so the same file picker and batch loop handle
+both without a separate code path) and `setup_finetune_tab` (drives
+`GifTuner` for one GIF or video at a time, live-previewing the animated
+result as the user adjusts limit/priority/quality). Every encode — bulk or
+fine-tune — runs on a background `Thread` and posts results back via
+`self.root.after(0, ...)`, since Tk is not thread-safe and must only be
+touched from the main thread.
 
 **`theming.py`** applies color themes from the separate
 [VisualAssault](https://github.com/gerp93/VisualAssault) project. It forces

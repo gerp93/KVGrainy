@@ -14,6 +14,7 @@ from kvgrainy import (
     parse_size_limit,
     optimize_image,
     SUPPORTED_EXTENSIONS,
+    VIDEO_EXTENSIONS,
     GifTuner,
 )
 from updater import CURRENT_VERSION, check_for_update, download_update, apply_update_and_restart
@@ -168,7 +169,7 @@ class KVGrainyGUI:
         subtitle.pack(anchor="w")
 
         # Input Paths Frame
-        paths_frame = ttk.LabelFrame(root, text="Input Images", padding=10)
+        paths_frame = ttk.LabelFrame(root, text="Input Images / Videos", padding=10)
         paths_frame.pack(fill=tk.X, padx=10, pady=5)
         
         self.paths_display = tk.Text(paths_frame, height=3, width=60, wrap=tk.WORD)
@@ -260,12 +261,12 @@ class KVGrainyGUI:
         self.tuner_limit_bytes = 0
 
         # File selection
-        file_frame = ttk.LabelFrame(root, text="GIF File", padding=10)
+        file_frame = ttk.LabelFrame(root, text="GIF or Video File", padding=10)
         file_frame.pack(fill=tk.X, padx=10, pady=5)
 
         self.tuner_file_var = tk.StringVar(value="No file selected")
         ttk.Label(file_frame, textvariable=self.tuner_file_var).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(file_frame, text="Open GIF", command=self.tuner_open_file).pack(side=tk.RIGHT)
+        ttk.Button(file_frame, text="Open File", command=self.tuner_open_file).pack(side=tk.RIGHT)
 
         # Controls
         controls_frame = ttk.LabelFrame(root, text="Controls", padding=10)
@@ -355,13 +356,17 @@ class KVGrainyGUI:
             self.tuner_busy_overlay.place_forget()
 
     def tuner_open_file(self):
-        file = filedialog.askopenfilename(title="Select GIF File", filetypes=[("GIF Files", "*.gif")])
+        video_patterns = " ".join(f"*{ext}" for ext in VIDEO_EXTENSIONS)
+        file = filedialog.askopenfilename(
+            title="Select GIF or Video File",
+            filetypes=[("GIF/Video Files", f"*.gif {video_patterns}"), ("All Files", "*.*")],
+        )
         if not file:
             return
         try:
             self.tuner = GifTuner(Path(file))
         except Exception as e:
-            messagebox.showerror("Error", f"Could not open GIF: {e}")
+            messagebox.showerror("Error", f"Could not open file: {e}")
             return
         self.tuner_path = Path(file)
         self.tuner_file_var.set(f"{self.tuner_path.name}  ({self.tuner.frame_count} frames, {self.tuner.original_size[0]}x{self.tuner.original_size[1]})")
@@ -496,8 +501,8 @@ class KVGrainyGUI:
 
     def add_file(self):
         file = filedialog.askopenfilename(
-            title="Select Image File",
-            filetypes=[("Image Files", " ".join(f"*{ext}" for ext in SUPPORTED_EXTENSIONS)), ("All Files", "*.*")]
+            title="Select Image or Video File",
+            filetypes=[("Image/Video Files", " ".join(f"*{ext}" for ext in SUPPORTED_EXTENSIONS)), ("All Files", "*.*")]
         )
         if file:
             self.paths.append(file)
