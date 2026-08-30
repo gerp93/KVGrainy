@@ -1,9 +1,27 @@
 import argparse
 import io
 import math
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+if getattr(sys, "frozen", False):
+    # PyInstaller doesn't bundle package dist-info metadata by default, but
+    # imageio's __init__.py looks itself up via importlib.metadata.version()
+    # at import time and crashes with PackageNotFoundError when frozen.
+    # Patch in a fallback before importing it.
+    import importlib.metadata
+
+    _orig_metadata_version = importlib.metadata.version
+
+    def _metadata_version_with_fallback(name, *args, **kwargs):
+        try:
+            return _orig_metadata_version(name, *args, **kwargs)
+        except importlib.metadata.PackageNotFoundError:
+            return "0.0.0"
+
+    importlib.metadata.version = _metadata_version_with_fallback
 
 import imageio
 from PIL import Image, ImageChops
