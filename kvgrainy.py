@@ -1,5 +1,6 @@
 import argparse
 import io
+import logging
 import math
 import sys
 from dataclasses import dataclass
@@ -24,7 +25,10 @@ if getattr(sys, "frozen", False):
     importlib.metadata.version = _metadata_version_with_fallback
 
 import imageio
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageCms, ImageOps
+
+log = logging.getLogger(__name__)
+_SRGB_PROFILE = None
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv"}
@@ -103,6 +107,50 @@ def iter_images(paths: Iterable[str]) -> list[Path]:
                 if file.is_file() and file.suffix.lower() in SUPPORTED_EXTENSIONS:
                     images.append(file)
     return sorted(set(images))
+
+
+def _srgb_profile():
+    global _SRGB_PROFILE
+    if _SRGB_PROFILE is None:
+        _SRGB_PROFILE = ImageCms.createProfile("sRGB")
+    return _SRGB_PROFILE
+
+
+def to_srgb(image: Image.Image) -> Image.Image:
+    """Convert to sRGB (honoring any embedded ICC profile) so colors survive stripping the profile.
+
+    Output encoders don't embed the source profile, so a wide-gamut or CMYK
+    source must be converted up front or its colors shift on every viewer.
+    CMYK always becomes RGB; images without a profile are assumed sRGB.
+    """
+    icc = image.info.get("icc_profile")
+    if icc and image.mode in ("RGB", "RGBA", "LA", "L", "CMYK"):
+        alpha = None
+        base = image
+        if image.mode in ("RGBA", "LA"):
+            alpha = image.getchannel("A")
+            base = image.convert("RGB" if image.mode == "RGBA" else "L")
+        try:
+            converted = ImageCms.profileToProfile(
+                base, ImageCms.ImageCmsProfile(io.BytesIO(icc)), _srgb_profile(),
+                outputMode="RGB", renderingIntent=ImageCms.Intent.PERCEPTUAL,
+            )
+        except (ImageCms.PyCMSError, OSError):
+            log.warning("Unusable ICC profile; assuming sRGB")
+        else:
+            if alpha is not None:
+                converted.putalpha(alpha)
+            return converted
+    if image.mode == "CMYK":
+        return image.convert("RGB")
+    return image
+
+
+def load_static_image(path: Path) -> Image.Image:
+    """Open a still image upright (EXIF orientation applied) and in sRGB."""
+    with Image.open(path) as opened:
+        opened.load()
+        return to_srgb(ImageOps.exif_transpose(opened))
 
 
 def encode_image(image: Image.Image, fmt: str, quality: int | None) -> bytes:
@@ -425,10 +473,13 @@ def optimize_image(
         frames, durations, loop = load_video_frames(image_path, fps, start_time, end_time)
         return optimize_frames(image_path, limit_bytes, output_dir, frames, durations, loop)
 
-    original = Image.open(image_path)
-    if getattr(original, "is_animated", False):
-        frames, durations, loop = load_gif_frames(original)
+    with Image.open(image_path) as probe:
+        animated = getattr(probe, "is_animated", False)
+        if animated:
+            frames, durations, loop = load_gif_frames(probe)
+    if animated:
         return optimize_frames(image_path, limit_bytes, output_dir, frames, durations, loop)
+    original = load_static_image(image_path)
     if format_override:
         formats = [format_override.upper()]
     else:
