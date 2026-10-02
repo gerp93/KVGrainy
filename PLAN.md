@@ -35,7 +35,7 @@ after.
 | 0.1 | EXIF orientation, sRGB conversion, fidelity tests (PR #23) | Merged |
 | 0.2 | Benchmark corpus: photo, screenshot, transparent PNG, CMYK, rotated phone photo, animated GIF, short video; committed or fetchable by script | `scripts/benchmark.py --list` shows the corpus |
 | 0.3 | `scripts/benchmark.py`: for each file × size limit, run the Python engine and CLI equivalents of the competition (cjpeg/mozjpeg, cwebp, avifenc, oxipng, pngquant, gifski, ffmpeg), score each output with SSIMULACRA2 | Produces a table of size and quality per tool |
-| 0.4 | Read the table: where do we lose, by how much | Written summary in `docs/benchmark-baseline.md` |
+| 0.4 | Read the table: where do we lose, by how much | Written summary in `docs/benchmark-baseline.md` (first pass on a synthetic corpus is in; rerun on real images) |
 
 **Gate:** if the baseline shows we can't plausibly beat the best encoders with a
 better search and encoders, rethink the pitch before building more.
