@@ -1,88 +1,96 @@
 # KVGrainy public-release plan
 
-**Goal:** a free, local-first "make it fit under N MB" tool that strangers pick
-over Squoosh / TinyPNG / ezgif / ffmpeg for a specific job.
+**Goal:** the best tool for one job: take an image, GIF, or clip and get it
+under a size limit with the best quality possible. Everything else is
+secondary. Free, local-first, nothing leaves your PC.
 
-**Positioning (the wedge):** drop in an image or clip, pick a target
-(Discord, email, GitHub, custom), get the best version that fits. Nothing
-leaves your PC.
+**Core competency:** output quality at a target size, and how fast we find it.
+Stack and priorities follow from that, not from the UI.
 
 **Non-goals:** a general-purpose image editor, cloud features, accounts.
 
-Phases are ordered by dependency. Each phase should ship (merge to `main`,
-auto-release) on its own; don't batch them.
+## Target stack
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| Engine | **Rust library** (`kvgrainy-core`) | Calls the best native encoders directly, real multithreading for the search, single small binary, reusable from CLI/GUI/WASM |
+| Encoders | mozjpeg (or jpegli), libwebp, AVIF (`ravif`/rav1e), oxipng + libimagequant (pngquant), gifski, ffmpeg for video | Beat Pillow defaults on size at equal quality |
+| Metric | SSIMULACRA2 (butteraugli as fallback) | Pick what *looks* best, not what has lowest pixel error |
+| CLI | Rust binary over the core crate | Scriptable, same engine as the app |
+| UI | **Tauri 2** (web front end, TypeScript) | Modern look, small installers, system webview |
+| Python code | Becomes the **reference engine** | Behavior baseline and benchmark comparison until the Rust engine reaches parity, then retired |
+
+Phases are ordered by dependency and risk. Each ships (merges to `main`) on its
+own; don't batch them.
 
 ---
 
-## Phase 1 — Correctness and safety net
+## Phase 0 — Correctness of the reference engine and a baseline
 
-Protects everything built later. Mostly invisible to users, but these are the
-bugs that would produce bad first impressions.
-
-| # | Task | Done when |
-|---|------|-----------|
-| 1.1 | Apply EXIF orientation (`ImageOps.exif_transpose`) on load | Rotated phone photos come out upright |
-| 1.2 | Preserve/convert ICC color profile (convert to sRGB, embed or strip deliberately) | Wide-gamut photo has no visible color shift |
-| 1.3 | Add "strip metadata" option (default on for privacy, GPS especially) | Output has no EXIF/GPS when enabled |
-| 1.4 | Video: honor rotation metadata; decode downscaled / stream instead of holding every full-res RGBA frame; cap clip length with a clear error | 2-min 1080p clip doesn't exceed a sane memory budget |
-| 1.5 | Cooperative cancel + progress callback in the engine (`optimize_image`, `GifTuner`) | GUI/CLI can abort mid-search |
-| 1.6 | Cap search effort for large inputs (coarser scale ladder, early exit once utilization is high) | 20 MP photo finishes in a few seconds |
-| 1.7 | Test corpus + tests: CMYK, transparent PNG, animated GIF, rotated phone photo, rotated phone video, tiny image already under limit, impossible limit | `python -m unittest` covers GIF, video, `GifTuner`, and failure paths |
-| 1.8 | Clear failure result when nothing fits (best-effort smallest + message) instead of silence | No silent no-output cases |
-
-## Phase 2 — The wedge: presets and video output
+Done or in progress in the Python code; this is the yardstick for everything
+after.
 
 | # | Task | Done when |
 |---|------|-----------|
-| 2.1 | Target presets (Discord 10 MB, email 25 MB, GitHub 10 MB, Slack, custom) in CLI (`--preset`) and GUI | One click sets the limit |
-| 2.2 | MP4/WebM output for video input, targeting a size (bitrate search / two-pass) | Video in → video under N MB out |
-| 2.3 | Animated WebP (and later AVIF) output for animated input | User can choose GIF / WebP / MP4 |
-| 2.4 | Smart default: recommend the output type per preset (e.g. video → MP4 unless GIF requested) | Happy path needs no format choice |
-| 2.5 | Update README/CLAUDE.md: video, presets, GUI, Fine-Tune tab | Docs match behavior |
+| 0.1 | EXIF orientation, sRGB conversion, fidelity tests (PR #23) | Merged |
+| 0.2 | Benchmark corpus: photo, screenshot, transparent PNG, CMYK, rotated phone photo, animated GIF, short video; committed or fetchable by script | `scripts/benchmark.py --list` shows the corpus |
+| 0.3 | `scripts/benchmark.py`: for each file × size limit, run the Python engine and CLI equivalents of the competition (cjpeg/mozjpeg, cwebp, avifenc, oxipng, pngquant, gifski, ffmpeg), score each output with SSIMULACRA2 | Produces a table of size and quality per tool |
+| 0.4 | Read the table: where do we lose, by how much | Written summary in `docs/benchmark-baseline.md` |
 
-## Phase 3 — Be measurably better
+**Gate:** if the baseline shows we can't plausibly beat the best encoders with a
+better search and encoders, rethink the pitch before building more.
+
+## Phase 1 — Rust engine core (`kvgrainy-core`)
 
 | # | Task | Done when |
 |---|------|-----------|
-| 3.1 | Swap in stronger encoders: mozjpeg (JPEG), oxipng/pngquant (PNG), gifski or gifsicle (GIF), AVIF | Sizes beat Pillow defaults at equal quality |
-| 3.2 | Replace RMS with a perceptual metric (SSIM first; SSIMULACRA2 if practical) and re-tune `VISUAL_WEIGHT` / `SIZE_UTILIZATION_WEIGHT` against eyeballed results | Chosen candidates look better on the corpus |
-| 3.3 | Benchmark script: fixed corpus vs TinyPNG / Squoosh / ffmpeg, output a table | `scripts/benchmark.py` produces publishable numbers |
-| 3.4 | Packaging check: bundled encoder binaries work in the PyInstaller build on all 3 OSes | Release artifacts pass a smoke test |
+| 1.1 | Cargo workspace; `kvgrainy-core` + `kvgrainy-cli` crates; CI builds on Linux/Windows/macOS | `cargo test` green in CI on all three |
+| 1.2 | Load: EXIF orientation, ICC to sRGB (CMYK included), strip metadata (GPS especially) by default | Port of the Phase 0.1 fidelity tests passes |
+| 1.3 | Encoders: JPEG (mozjpeg), WebP, PNG (oxipng + quantization), AVIF | Each encodes at a requested quality |
+| 1.4 | Search: size-limit binary search over quality and scale, parallelized, with a cooperative cancel and a progress callback | Beats the Python engine on the corpus at equal limits |
+| 1.5 | Large-input effort cap (coarser scale ladder, early exit when utilization is high) | 20 MP photo finishes in a few seconds |
+| 1.6 | Clear failure result when nothing fits (best-effort smallest plus message) | No silent no-output cases |
+| 1.7 | CLI parity with `kvgrainy.py` flags | Existing README examples work |
 
-Gate: if 3.3 shows we lose badly, fix that before polishing UI — the
-comparison table is the marketing.
+## Phase 2 — Perceptual search, animation, video, presets
 
-## Phase 4 — UI that feels current
+| # | Task | Done when |
+|---|------|-----------|
+| 2.1 | Replace RMS with SSIMULACRA2 in the search; re-tune the score weighting on the corpus | Chosen candidates look better than Phase 1 on the corpus |
+| 2.2 | Animated output: GIF (gifski), animated WebP, later AVIF; frame-drop, color and scale ladders | Animated GIF in, smaller better GIF out |
+| 2.3 | Video input: ffmpeg decode (rotation honored, streamed/downscaled, clip length cap); MP4/WebM output to a target size via bitrate search | 2-min 1080p clip stays within a sane memory budget; video in, video under N MB out |
+| 2.4 | Target presets (Discord, email, GitHub, Slack, custom) and a smart default output type per preset | One flag or click sets the limit; happy path needs no format choice |
+| 2.5 | Benchmark rerun against Phase 0 | Table shows we win or tie on size at equal quality; published in `docs/` |
 
-**Decision needed before starting:** which UI stack.
+**Gate:** if 2.5 shows we lose badly, fix that before the UI.
 
-| Option | Notes |
-|--------|-------|
-| Polish Tkinter | Cheapest; ceiling on look. |
-| **PySide6 (Qt) — recommended default** | Native, still Python, reuses the engine unchanged. Check against KVG_Standards theming (currently `visual-assault-tkinter`) — may need a Qt theme package or a documented exception. |
-| Tauri/Electron shell over the Python engine | Best look; biggest effort and binary. |
-| WASM/browser build | Best reach (zero install) but heavy codec work; consider as a separate follow-up, not a replacement. |
+## Phase 3 — Tauri UI
 
-Regardless of stack, the feature list is the same:
+Rust commands wrap `kvgrainy-core`; progress and cancel flow over events. Keep
+all logic in the core crate so the UI stays thin.
 
 - Drag and drop and paste from clipboard
-- Before/after slider and live size estimate
+- Preset picker, then done: drop file, pick target, get result
+- Before/after slider and live size estimate (downscaled previews, not full-size decode in the webview)
 - Real progress and cancel
-- "Copy result to clipboard"
-- Windows right-click "Reduce with KVGrainy" entry
-- Sensible default flow: drop file → pick preset → done
+- Manual fine-tune for GIFs (port of the current Fine-Tune tab)
+- Copy result to clipboard; reveal in folder
+- Theming: apply VisualAssault tokens if they can be consumed as CSS/JSON; otherwise document the exception in KVG_Standards
+- Test on all three OS webviews (WebView2, WKWebView, WebKitGTK)
 
-## Phase 5 — Trust and distribution
+## Phase 4 — Trust and distribution
 
 | # | Task | Done when |
 |---|------|-----------|
-| 5.1 | Code-sign the Windows build (and notarize macOS) via the KVG_Standards release workflow | No SmartScreen/Gatekeeper warning |
-| 5.2 | Reduce download size / startup time (consider onedir + installer over onefile) | Cold start measured and acceptable |
-| 5.3 | Publish to winget, Scoop, Homebrew | `winget install` works |
-| 5.4 | Landing page: demo before/after (made with the app), privacy pitch, benchmark table, download button | Page live |
-| 5.5 | Verify self-update end to end on signed builds | Update from N-1 → N works on all OSes |
+| 4.1 | Release workflow for Tauri builds on all three OSes; code-sign Windows and notarize macOS | No SmartScreen/Gatekeeper warning |
+| 4.2 | Self-update via Tauri updater (replaces `updater.py`); record the change in KVG_Standards | Update from N-1 to N works on all OSes |
+| 4.3 | Bundled ffmpeg and encoders pass a smoke test in release artifacts | Smoke test in CI |
+| 4.4 | Publish to winget, Scoop, Homebrew | `winget install` works |
+| 4.5 | Windows right-click "Reduce with KVGrainy" entry | Works from Explorer |
+| 4.6 | Landing page: before/after demo, privacy pitch, benchmark table, download button | Page live |
+| 4.7 | Retire the Python app; update README, CLAUDE.md, TODO.md | Docs match behavior |
 
-## Phase 6 — Launch
+## Phase 5 — Launch
 
 - Post where the pain is: Discord/streamer communities, r/DataHoarder, docs/README-GIF authors, Show HN.
 - Lead with the benchmark table and a 10-second demo, not a feature list.
@@ -93,12 +101,9 @@ Regardless of stack, the feature list is the same:
 
 ## Risks
 
-- **Benchmark loss:** stock-quality gap vs TinyPNG/Squoosh is the biggest unknown — mitigated by doing Phase 3 early.
-- **Binary bloat/AV false positives:** bundled ffmpeg + encoders in PyInstaller; mitigated by signing and onedir.
-- **UI rewrite scope:** the largest single chunk of work; keep the engine UI-agnostic so it can't block earlier phases.
-- **Standards drift:** a non-Tkinter UI touches KVG_Standards theming; resolve before Phase 4.
-
-## Suggested first PR
-
-Phase 1.1 + 1.2 + 1.7 (EXIF, color profile, tests for them): small, low-risk,
-and sets the pattern for the rest.
+- **Benchmark loss:** the quality gap vs the best encoders and Squoosh/TinyPNG is the biggest unknown; mitigated by doing Phase 0 and the Phase 2 gate before the UI.
+- **Rewrite cost:** the engine and tests are rewritten. Mitigate by keeping the Python engine as the behavior reference and porting its tests.
+- **Two languages:** Rust (engine) plus TypeScript (UI). Keep the boundary small: a handful of commands and events.
+- **Webview differences:** WebKitGTK on Linux is the weakest. Test early and keep the UI simple.
+- **Binary bloat/AV false positives:** bundled ffmpeg plus encoders; mitigate with signing.
+- **Standards drift:** Tauri, Rust CI and updater differ from the Python/Tkinter standards in KVG_Standards; resolve before Phase 3.
