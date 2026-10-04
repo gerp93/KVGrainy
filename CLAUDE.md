@@ -22,6 +22,10 @@ python gui.py
 python -m unittest discover -s tests -v
 python -m unittest tests.test_kvgrainy.KVGrainyTests.test_parse_size_limit   # single test
 
+# Rust engine (in progress, see PLAN.md; the Python code above is the reference engine)
+cargo test --workspace
+cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduced
+
 # Compile-check after edits (fast syntax/import sanity check, no test runner needed)
 python -m py_compile gui.py kvgrainy.py updater.py theming.py
 ```
@@ -37,6 +41,10 @@ There is no PyPI package for it. Bumping the pinned version is a one-line,
 standalone commit — see that doc.
 
 ## Architecture
+
+> A Rust rewrite of the engine (`crates/kvgrainy-core`, `crates/kvgrainy-cli`) is
+> underway per [PLAN.md](PLAN.md); it handles still images only so far. The
+> Python engine below remains the shipped, reference implementation.
 
 KVGrainy has two independent entry points sharing one optimization engine:
 

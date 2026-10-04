@@ -155,6 +155,22 @@ def kvgrainy_engine(source: Image.Image, limit: int, work: Path) -> tuple[bytes,
     return candidate.image_bytes, ext
 
 
+RUST_CLI = Path(__file__).resolve().parent.parent / "target" / "release" / "kvgrainy"
+
+
+def kvgrainy_rust(source: Image.Image, limit: int, work: Path) -> tuple[bytes, str] | None:
+    exe = shutil.which("kvgrainy") or (str(RUST_CLI) if RUST_CLI.exists() else None)
+    if not exe:
+        return None
+    src = work / "rs_input.png"
+    source.save(src)
+    out = work / "rs_out"
+    shutil.rmtree(out, ignore_errors=True)
+    proc = subprocess.run([exe, str(src), "--limit", str(limit), "--output", str(out)], capture_output=True)
+    produced = sorted(out.glob("rs_input_optimized.*")) if proc.returncode == 0 else []
+    return (produced[0].read_bytes(), produced[0].suffix) if produced else None
+
+
 def cli_encoder(tool: str, ext: str, build: Callable[[Path, Path, int], list[str]], needs_ppm: bool = False):
     def run(source: Image.Image, limit: int, work: Path) -> tuple[bytes, str] | None:
         exe = shutil.which(tool)
@@ -181,6 +197,7 @@ def cli_encoder(tool: str, ext: str, build: Callable[[Path, Path, int], list[str
 
 CONTESTANTS: dict[str, Callable] = {
     "kvgrainy": kvgrainy_engine,
+    "kvgrainy-rs": kvgrainy_rust,
     "pillow-jpeg-q": pillow_encoder("JPEG", ".jpg"),
     "pillow-webp-q": pillow_encoder("WEBP", ".webp"),
     "mozjpeg": cli_encoder("cjpeg", ".jpg", lambda i, o, q: ["-quality", str(q), "-outfile", str(o), str(i)], True),
@@ -191,6 +208,8 @@ CONTESTANTS: dict[str, Callable] = {
 
 
 def available(name: str) -> bool:
+    if name == "kvgrainy-rs":
+        return shutil.which("kvgrainy") is not None or RUST_CLI.exists()
     tool = {"mozjpeg": "cjpeg", "cwebp": "cwebp", "avifenc": "avifenc", "pngquant": "pngquant"}.get(name)
     return tool is None or shutil.which(tool) is not None
 

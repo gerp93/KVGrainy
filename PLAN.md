@@ -44,12 +44,12 @@ better search and encoders, rethink the pitch before building more.
 
 | # | Task | Done when |
 |---|------|-----------|
-| 1.1 | Cargo workspace; `kvgrainy-core` + `kvgrainy-cli` crates; CI builds on Linux/Windows/macOS | `cargo test` green in CI on all three |
-| 1.2 | Load: EXIF orientation, ICC to sRGB (CMYK included), strip metadata (GPS especially) by default | Port of the Phase 0.1 fidelity tests passes |
-| 1.3 | Encoders: JPEG (mozjpeg), WebP, PNG (oxipng + quantization), AVIF | Each encodes at a requested quality |
-| 1.4 | Search: size-limit binary search over quality and scale, parallelized, with a cooperative cancel and a progress callback | Beats the Python engine on the corpus at equal limits |
+| 1.1 | Cargo workspace; `kvgrainy-core` + `kvgrainy-cli` crates; CI builds on Linux/Windows/macOS | `cargo test` green in CI on all three (workflow added; first CI run pending) |
+| 1.2 | Load: EXIF orientation, ICC to sRGB (CMYK included), strip metadata (GPS especially) by default | Port of the Phase 0.1 fidelity tests passes (orientation, metadata, bad-ICC fallback done; real wide-gamut and CMYK color checks still to add) |
+| 1.3 | Encoders: JPEG (mozjpeg), WebP, PNG (oxipng + quantization), AVIF | Each encodes at a requested quality (JPEG, WebP, plain PNG done; oxipng, quantization, AVIF to do) |
+| 1.4 | Search: size-limit binary search over quality and scale, parallelized, with a cooperative cancel and a progress callback | Beats the Python engine on the corpus at equal limits (search, cancel, progress done; 3-30x faster, but quality not yet at parity) |
 | 1.5 | Large-input effort cap (coarser scale ladder, early exit when utilization is high) | 20 MP photo finishes in a few seconds |
-| 1.6 | Clear failure result when nothing fits (best-effort smallest plus message) | No silent no-output cases |
+| 1.6 | Clear failure result when nothing fits (best-effort smallest plus message) | No silent no-output cases (error reports the smallest size tried; best-effort file not written yet) |
 | 1.7 | CLI parity with `kvgrainy.py` flags | Existing README examples work |
 
 ## Phase 2 — Perceptual search, animation, video, presets

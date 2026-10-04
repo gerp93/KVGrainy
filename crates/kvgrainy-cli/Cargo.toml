@@ -1,0 +1,15 @@
+[package]
+name = "kvgrainy-cli"
+description = "Command-line interface for kvgrainy-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "kvgrainy"
+path = "src/main.rs"
+
+[dependencies]
+kvgrainy-core = { path = "../kvgrainy-core" }
+clap = { version = "4", features = ["derive"] }
