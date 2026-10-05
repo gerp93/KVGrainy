@@ -78,16 +78,24 @@ fn transparent_image_keeps_alpha_and_uses_alpha_formats() {
 }
 
 #[test]
-fn stays_under_limit_and_reports_progress() {
+fn stays_under_limit_and_progress_reaches_total() {
     let limit = 20 * 1024;
-    let calls = std::sync::atomic::AtomicUsize::new(0);
+    let furthest = std::sync::atomic::AtomicUsize::new(0);
+    let expected_total = std::sync::atomic::AtomicUsize::new(0);
     let best = optimize(&noise(300, 200), &Options::new(limit), &|p| {
-        assert!(p.completed <= p.total);
-        calls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(p.completed <= p.total, "{p:?}");
+        furthest.fetch_max(p.completed, std::sync::atomic::Ordering::Relaxed);
+        expected_total.store(p.total, std::sync::atomic::Ordering::Relaxed);
     })
     .unwrap();
     assert!(best.bytes.len() as u64 <= limit);
-    assert_eq!(calls.into_inner(), 60); // 4 formats x 15 scales
+    assert_eq!(furthest.into_inner(), expected_total.into_inner());
+}
+
+#[test]
+fn generous_limit_stops_at_full_scale() {
+    let best = optimize(&noise(200, 200), &Options::new(10 * 1024 * 1024), &no_progress).unwrap();
+    assert_eq!(best.scale, 1.0);
 }
 
 #[test]

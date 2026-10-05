@@ -83,14 +83,16 @@ fn encode_png(raster: &Raster) -> Result<Vec<u8>, String> {
     Ok(out.into_inner())
 }
 
-/// AVIF via rav1e. Single-threaded per encode because the search already runs
-/// many encodes in parallel; speed 7 trades a little size for search throughput.
+/// AVIF via rav1e at speed 8, which trades a little size for search throughput.
+/// Pinned to one thread per encode: rav1e's output depends on its thread count,
+/// and results must not vary with the machine's core count. The search runs
+/// formats in parallel instead.
 fn encode_avif(raster: &Raster, quality: u8) -> Result<Vec<u8>, String> {
     let (w, h) = (raster.width as usize, raster.height as usize);
     let encoder = ravif::Encoder::new()
         .with_quality(quality as f32)
         .with_alpha_quality(quality as f32)
-        .with_speed(7)
+        .with_speed(8)
         .with_num_threads(Some(1));
     let encoded = match &raster.alpha {
         Some(alpha) => {

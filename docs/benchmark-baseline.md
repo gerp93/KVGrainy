@@ -60,3 +60,24 @@ Tools: KVGrainy (current Python engine), Pillow JPEG/WebP at scale 1.0,
 
 These point in the direction of the plan (better encoders, perceptual metric, faster
 native search), but the gate in Phase 0.4 should be judged on a real corpus.
+
+
+## Rust engine (Phase 1), same corpus, 30% limit
+
+`kvgrainy-rs` is the Rust engine with SSIMULACRA2 scoring, AVIF, and the effort cap
+(4-core machine, same synthetic corpus and caveats as above; the Python column is the table above).
+
+| image | Python | Rust, exhaustive scale search | Rust, with effort cap |
+|---|---|---|---|
+| cmyk | 69.9 (14s) | 82.5 (103s) | 82.5 (38s) |
+| photo-like | 72.3 (26s) | 73.8 (198s) | 73.8 (77s) |
+| rotated phone | 76.2 (13s) | 78.8 (104s) | 78.8 (21s) |
+| screenshot-like | 48.9 (6s) | 62.1 (52s) | 55.5 (25s) |
+| transparent | 84.6 (60s) | 90.6 (37s) | 90.6 (12s) |
+
+- The Rust engine beats the Python engine on quality on every image, and beats `avifenc` on four of five (not the flat-color screenshot, where `avifenc` and `pngquant` score 98-100 because it has no palette PNG).
+- The effort cap costs nothing on four images and 6.6 points on the screenshot (the score is bumpy across scales on flat tiny images, so stopping early misses a better scale).
+- Two early-exit rules were tried and **rejected** because they cost real quality: accepting a full-scale fit at quality >= 60, and jumping to a predicted scale. Output size is not proportional to pixel count and not monotone in quality for small AVIFs.
+- rav1e output depends on its thread count, so AVIF encodes are pinned to one thread to keep results independent of the machine.
+
+**Where the time goes** (1200x800 photo): scoring one candidate with SSIMULACRA2 costs about 0.8 s, roughly 10x a JPEG or WebP encode; AVIF encodes cost 0.5-2.7 s. Time is therefore roughly (candidates scored) x 0.8 s plus AVIF encodes, so Phase 1.5's target (a 20 MP photo in a few seconds) is **not met**. Next: coarse-to-fine scale search to score fewer candidates, and a cheaper scoring path for large images.
