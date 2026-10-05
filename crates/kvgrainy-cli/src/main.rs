@@ -18,7 +18,7 @@ struct Args {
     /// Output directory
     #[arg(long, default_value = "./reduced")]
     output: PathBuf,
-    /// Force an output format (jpeg, png, webp); default picks the best
+    /// Force an output format (jpeg, png, webp, avif); default picks the best
     #[arg(long)]
     format: Option<String>,
 }
@@ -65,7 +65,7 @@ fn main() -> ExitCode {
     };
     let format = match args.format.as_deref().map(Format::parse) {
         Some(None) => {
-            eprintln!("error: unsupported format (use jpeg, png or webp)");
+            eprintln!("error: unsupported format (use jpeg, png, webp or avif)");
             return ExitCode::from(2);
         }
         Some(parsed) => parsed,
@@ -106,12 +106,13 @@ fn main() -> ExitCode {
                     continue;
                 }
                 println!(
-                    "[done] {name} -> {} | {:.1}KB | fmt={:?} quality={:?} scale={:.2}",
+                    "[done] {name} -> {} | {:.1}KB | fmt={:?} quality={:?} scale={:.2} score={:.3}",
                     out.file_name().unwrap_or_default().to_string_lossy(),
                     best.bytes.len() as f64 / 1024.0,
                     best.format,
                     best.quality,
-                    best.scale
+                    best.scale,
+                    best.score
                 );
             }
             Err(why) => {

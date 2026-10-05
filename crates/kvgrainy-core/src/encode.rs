@@ -8,6 +8,7 @@ use crate::raster::Raster;
 pub enum Format {
     Jpeg,
     Webp,
+    Avif,
     Png,
 }
 
@@ -16,6 +17,7 @@ impl Format {
         match self {
             Format::Jpeg => "jpg",
             Format::Webp => "webp",
+            Format::Avif => "avif",
             Format::Png => "png",
         }
     }
@@ -29,6 +31,7 @@ impl Format {
         match text.to_lowercase().as_str() {
             "jpeg" | "jpg" => Some(Format::Jpeg),
             "webp" => Some(Format::Webp),
+            "avif" => Some(Format::Avif),
             "png" => Some(Format::Png),
             _ => None,
         }
@@ -39,6 +42,7 @@ pub fn encode(format: Format, raster: &Raster, quality: u8) -> Result<Vec<u8>, S
     match format {
         Format::Jpeg => encode_jpeg(raster, quality),
         Format::Webp => Ok(encode_webp(raster, quality)),
+        Format::Avif => encode_avif(raster, quality),
         Format::Png => encode_png(raster),
     }
 }
@@ -77,4 +81,31 @@ fn encode_png(raster: &Raster) -> Result<Vec<u8>, String> {
     };
     result.map_err(|e| e.to_string())?;
     Ok(out.into_inner())
+}
+
+/// AVIF via rav1e. Single-threaded per encode because the search already runs
+/// many encodes in parallel; speed 7 trades a little size for search throughput.
+fn encode_avif(raster: &Raster, quality: u8) -> Result<Vec<u8>, String> {
+    let (w, h) = (raster.width as usize, raster.height as usize);
+    let encoder = ravif::Encoder::new()
+        .with_quality(quality as f32)
+        .with_alpha_quality(quality as f32)
+        .with_speed(7)
+        .with_num_threads(Some(1));
+    let encoded = match &raster.alpha {
+        Some(alpha) => {
+            let pixels: Vec<rgb::RGBA8> = raster
+                .rgb
+                .chunks_exact(3)
+                .zip(alpha)
+                .map(|(p, &a)| rgb::RGBA8::new(p[0], p[1], p[2], a))
+                .collect();
+            encoder.encode_rgba(imgref::Img::new(pixels.as_slice(), w, h))
+        }
+        None => {
+            let pixels: Vec<rgb::RGB8> = raster.rgb.chunks_exact(3).map(|p| rgb::RGB8::new(p[0], p[1], p[2])).collect();
+            encoder.encode_rgb(imgref::Img::new(pixels.as_slice(), w, h))
+        }
+    };
+    encoded.map(|e| e.avif_file).map_err(|e| e.to_string())
 }

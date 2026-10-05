@@ -87,7 +87,7 @@ fn stays_under_limit_and_reports_progress() {
     })
     .unwrap();
     assert!(best.bytes.len() as u64 <= limit);
-    assert_eq!(calls.into_inner(), 45); // 3 formats x 15 scales
+    assert_eq!(calls.into_inner(), 60); // 4 formats x 15 scales
 }
 
 #[test]
@@ -110,4 +110,33 @@ fn cancel_aborts_the_search() {
     let cancel = Arc::new(AtomicBool::new(true));
     let options = Options { cancel: Some(cancel), ..Options::new(50 * 1024) };
     assert!(matches!(optimize(&noise(100, 100), &options, &no_progress), Err(Error::Cancelled)));
+}
+
+#[test]
+fn avif_round_trips_through_encoder_and_decoder() {
+    let image = noise(64, 48);
+    let bytes = encode(Format::Avif, &image, 80).unwrap();
+    let reference = kvgrainy_core::score::Reference::new(&image);
+    let score = reference.score(&bytes, Format::Avif);
+    assert!(score > 0.3, "decoded AVIF should resemble the original, got {score}");
+}
+
+#[test]
+fn scorer_ranks_higher_quality_above_lower() {
+    let image = noise(128, 128);
+    let reference = kvgrainy_core::score::Reference::new(&image);
+    let high = reference.score(&encode(Format::Jpeg, &image, 95).unwrap(), Format::Jpeg);
+    let low = reference.score(&encode(Format::Jpeg, &image, 20).unwrap(), Format::Jpeg);
+    assert!(high > low, "q95 ({high}) should beat q20 ({low})");
+    let lossless = reference.score(&encode(Format::Png, &image, 100).unwrap(), Format::Png);
+    assert!(lossless > 0.99, "lossless PNG should score ~1.0, got {lossless}");
+}
+
+#[test]
+fn tiny_image_falls_back_to_pixel_score() {
+    // SSIMULACRA2 rejects images under 8x8; scoring must still work.
+    let tiny = Raster { width: 4, height: 4, rgb: vec![10, 200, 30].repeat(16), alpha: None };
+    let reference = kvgrainy_core::score::Reference::new(&tiny);
+    let score = reference.score(&encode(Format::Png, &tiny, 100).unwrap(), Format::Png);
+    assert!(score > 0.99, "{score}");
 }

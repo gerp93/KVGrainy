@@ -8,6 +8,7 @@ pub mod encode;
 pub mod limit;
 pub mod load;
 pub mod raster;
+pub mod score;
 pub mod search;
 
 pub use encode::Format;

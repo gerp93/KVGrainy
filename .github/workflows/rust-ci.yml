@@ -17,5 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # rav1e (AVIF encode) and libaom (AVIF decode for scoring) need an assembler.
+      - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
