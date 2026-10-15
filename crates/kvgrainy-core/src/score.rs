@@ -3,7 +3,6 @@
 use ssimulacra2::{compute_frame_ssimulacra2, ColorPrimaries, Rgb, TransferCharacteristic};
 
 use crate::encode::{Encoder, Format};
-use crate::native::NativeEncoder;
 use crate::raster::Raster;
 
 /// The original, prepared once so scoring many candidates doesn't redo the conversion.
@@ -27,8 +26,9 @@ impl Reference {
     /// downscaling is penalized by the metric itself. Transparency is judged
     /// composited over white. Images under 8x8 pixels, which SSIMULACRA2
     /// rejects, fall back to a pixel-error score.
+    #[cfg(feature = "native")]
     pub fn score(&self, payload: &[u8], format: Format) -> f64 {
-        self.score_with(&NativeEncoder, payload, format)
+        self.score_with(&crate::native::NativeEncoder, payload, format)
     }
 
     /// Like [`Reference::score`], decoding the candidate with `encoder`.

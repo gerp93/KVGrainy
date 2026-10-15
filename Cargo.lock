@@ -664,6 +664,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kvgrainy-wasm-spike"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "kvgrainy-core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "leb128"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

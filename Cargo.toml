@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/kvgrainy-core", "crates/kvgrainy-cli"]
+members = ["crates/kvgrainy-core", "crates/kvgrainy-cli", "crates/kvgrainy-wasm-spike"]
 resolver = "2"
 
 [workspace.package]

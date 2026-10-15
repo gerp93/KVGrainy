@@ -1,10 +1,10 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use crate::encode::{Encoder, Format};
-use crate::native::NativeEncoder;
 use crate::raster::Raster;
 use crate::score::Reference;
 
@@ -55,8 +55,9 @@ struct TaskResult {
 }
 
 /// Search with the native codecs. Shorthand for [`optimize_with`] and [`NativeEncoder`].
+#[cfg(feature = "native")]
 pub fn optimize(source: &Raster, options: &Options, progress: &(dyn Fn(Progress) + Sync)) -> Result<Candidate, Error> {
-    optimize_with(&NativeEncoder, source, options, progress)
+    optimize_with(&crate::native::NativeEncoder, source, options, progress)
 }
 
 /// Search for the best candidate under `options.limit_bytes`, encoding and decoding with `encoder`.
@@ -80,8 +81,11 @@ pub fn optimize_with(
     let cancelled = || options.cancel.as_ref().is_some_and(|c| c.load(Ordering::Relaxed));
     let reference = Reference::new(source);
 
-    let results: Vec<TaskResult> = formats
-        .par_iter()
+    #[cfg(feature = "parallel")]
+    let format_iter = formats.par_iter();
+    #[cfg(not(feature = "parallel"))]
+    let format_iter = formats.iter();
+    let results: Vec<TaskResult> = format_iter
         .map(|&format| search_format(encoder, &reference, source, options, format, &cancelled, &report))
         .collect();
 
