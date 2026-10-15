@@ -4,7 +4,7 @@ use std::sync::Arc;
 use kvgrainy_core::encode::{encode, Format};
 use kvgrainy_core::load::decode;
 use kvgrainy_core::raster::Raster;
-use kvgrainy_core::{optimize, Error, Options};
+use kvgrainy_core::{optimize, Encoder, Error, Options};
 
 fn noise(width: u32, height: u32) -> Raster {
     let mut rgb = Vec::with_capacity((width * height * 3) as usize);
@@ -147,4 +147,40 @@ fn tiny_image_falls_back_to_pixel_score() {
     let reference = kvgrainy_core::score::Reference::new(&tiny);
     let score = reference.score(&encode(Format::Png, &tiny, 100).unwrap(), Format::Png);
     assert!(score > 0.99, "{score}");
+}
+
+/// An encoder that delegates to the native one but counts calls, standing in for
+/// a codec set supplied by another target.
+struct CountingEncoder {
+    encodes: std::sync::atomic::AtomicUsize,
+    decodes: std::sync::atomic::AtomicUsize,
+}
+
+impl Encoder for CountingEncoder {
+    fn encode(&self, format: Format, raster: &Raster, quality: u8) -> Result<Vec<u8>, String> {
+        self.encodes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        kvgrainy_core::NativeEncoder.encode(format, raster, quality)
+    }
+
+    fn decode(&self, format: Format, payload: &[u8]) -> Option<Raster> {
+        self.decodes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        kvgrainy_core::NativeEncoder.decode(format, payload)
+    }
+}
+
+#[test]
+fn search_runs_on_a_custom_encoder() {
+    use kvgrainy_core::optimize_with;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let image = noise(96, 96);
+    let options = Options { format: Some(Format::Jpeg), ..Options::new(8 * 1024) };
+    let counting = CountingEncoder { encodes: AtomicUsize::new(0), decodes: AtomicUsize::new(0) };
+
+    let custom = optimize_with(&counting, &image, &options, &no_progress).unwrap();
+    let native = optimize(&image, &options, &no_progress).unwrap();
+
+    assert!(counting.encodes.load(Ordering::Relaxed) > 0, "search never called the custom encoder");
+    assert!(counting.decodes.load(Ordering::Relaxed) > 0, "scoring never decoded through the custom encoder");
+    assert_eq!(custom.bytes, native.bytes, "a delegating encoder must not change the result");
 }
