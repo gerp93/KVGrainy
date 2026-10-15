@@ -3,3 +3,6 @@ __pycache__/
 _version.py
 benchmark/corpus/
 target/
+
+# Stray pip wheels (installed from PyPI, never committed)
+*.whl
