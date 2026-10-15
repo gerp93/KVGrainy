@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use rayon::prelude::*;
 
-use crate::encode::{encode, Format};
+use crate::encode::{Encoder, Format};
+use crate::native::NativeEncoder;
 use crate::raster::Raster;
 use crate::score::Reference;
 
@@ -53,7 +54,18 @@ struct TaskResult {
     smallest: u64,
 }
 
+/// Search with the native codecs. Shorthand for [`optimize_with`] and [`NativeEncoder`].
 pub fn optimize(source: &Raster, options: &Options, progress: &(dyn Fn(Progress) + Sync)) -> Result<Candidate, Error> {
+    optimize_with(&NativeEncoder, source, options, progress)
+}
+
+/// Search for the best candidate under `options.limit_bytes`, encoding and decoding with `encoder`.
+pub fn optimize_with(
+    encoder: &dyn Encoder,
+    source: &Raster,
+    options: &Options,
+    progress: &(dyn Fn(Progress) + Sync),
+) -> Result<Candidate, Error> {
     let formats = match options.format {
         Some(f) => vec![f],
         None if source.alpha.is_some() => vec![Format::Webp, Format::Avif, Format::Png],
@@ -70,7 +82,7 @@ pub fn optimize(source: &Raster, options: &Options, progress: &(dyn Fn(Progress)
 
     let results: Vec<TaskResult> = formats
         .par_iter()
-        .map(|&format| search_format(&reference, source, options, format, &cancelled, &report))
+        .map(|&format| search_format(encoder, &reference, source, options, format, &cancelled, &report))
         .collect();
 
     if cancelled() {
@@ -102,6 +114,7 @@ const MIN_QUALITY: u8 = 20;
 /// quality ends the search, a scale that cannot fit costs one encode, and each
 /// smaller scale only searches quality upward from the previous scale's result.
 fn search_format(
+    encoder: &dyn Encoder,
     reference: &Reference,
     source: &Raster,
     options: &Options,
@@ -118,11 +131,13 @@ fn search_format(
     while index < SCALE_FACTORS.len() && !cancelled() {
         let scale = SCALE_FACTORS[index];
         let resized = source.scaled(scale);
-        let attempt = fit_at_scale(&resized, options.limit_bytes, format, min_quality, cancelled, &mut smallest)
+        let attempt = fit_at_scale(encoder, &resized, options.limit_bytes, format, min_quality, cancelled, &mut smallest)
             .or_else(|| {
                 // The warm start can be too optimistic; retry from the floor before giving up on this scale.
                 (min_quality > MIN_QUALITY)
-                    .then(|| fit_at_scale(&resized, options.limit_bytes, format, MIN_QUALITY, cancelled, &mut smallest))
+                    .then(|| {
+                        fit_at_scale(encoder, &resized, options.limit_bytes, format, MIN_QUALITY, cancelled, &mut smallest)
+                    })
                     .flatten()
             });
 
@@ -130,7 +145,7 @@ fn search_format(
         match attempt {
             Some((bytes, quality)) if !cancelled() => {
                 min_quality = quality;
-                let score = reference.score(&bytes, format);
+                let score = reference.score_with(encoder, &bytes, format);
                 let improved = best.as_ref().is_none_or(|b| score > b.score + 0.001);
                 if improved {
                     best = Some(Candidate { bytes, format, quality: format.has_quality().then_some(quality), scale, score });
@@ -159,6 +174,7 @@ fn search_format(
 /// Highest quality in `min_quality..=100` whose output fits, as `(bytes, quality)`.
 /// Formats without a quality knob are encoded once.
 fn fit_at_scale(
+    encoder: &dyn Encoder,
     resized: &Raster,
     limit: u64,
     format: Format,
@@ -172,7 +188,7 @@ fn fit_at_scale(
         if cancelled() {
             return false;
         }
-        let Ok(bytes) = encode(format, resized, quality) else {
+        let Ok(bytes) = encoder.encode(format, resized, quality) else {
             return false;
         };
         last_len.set(bytes.len() as u64);
