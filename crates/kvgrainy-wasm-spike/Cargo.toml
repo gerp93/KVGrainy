@@ -1,0 +1,18 @@
+[package]
+name = "kvgrainy-wasm-spike"
+description = "Phase 1 spike: run the shared core in a browser/Node WASM runtime and time it. Not shipped."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+kvgrainy-core = { path = "../kvgrainy-core", default-features = false }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.129"

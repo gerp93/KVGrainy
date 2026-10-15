@@ -1,4 +1,3 @@
-use crate::native::NativeEncoder;
 use crate::raster::Raster;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -52,6 +51,7 @@ pub trait Encoder: Sync {
 }
 
 /// Encode with the native codecs. Shorthand for `NativeEncoder.encode(..)`.
+#[cfg(feature = "native")]
 pub fn encode(format: Format, raster: &Raster, quality: u8) -> Result<Vec<u8>, String> {
-    NativeEncoder.encode(format, raster, quality)
+    crate::native::NativeEncoder.encode(format, raster, quality)
 }
