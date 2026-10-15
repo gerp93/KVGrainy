@@ -1,0 +1,61 @@
+{
+  "tag": "v0.2.0",
+  "themes": [
+    {
+      "id": "blue-oval",
+      "name": "Blue Oval"
+    },
+    {
+      "id": "bubblegum",
+      "name": "Bubblegum"
+    },
+    {
+      "id": "commander-keen",
+      "name": "Commander Keen"
+    },
+    {
+      "id": "electric-lime",
+      "name": "Electric Lime"
+    },
+    {
+      "id": "flambeau",
+      "name": "Flambeau"
+    },
+    {
+      "id": "flambeau-inverse",
+      "name": "Flambeau Inverse"
+    },
+    {
+      "id": "green-acres",
+      "name": "Green Acres"
+    },
+    {
+      "id": "hacker",
+      "name": "Hacker"
+    },
+    {
+      "id": "hawkeye",
+      "name": "Hawkeye"
+    },
+    {
+      "id": "lava",
+      "name": "Lava"
+    },
+    {
+      "id": "merica",
+      "name": "Merica"
+    },
+    {
+      "id": "neon",
+      "name": "Neon"
+    },
+    {
+      "id": "red-barn",
+      "name": "Red Barn"
+    },
+    {
+      "id": "retrowave",
+      "name": "Retrowave"
+    }
+  ]
+}

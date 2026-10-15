@@ -1,0 +1,215 @@
+---
+import '../styles/global.css';
+// Vendored from VisualAssault at a pinned tag; see scripts/update-visual-assault.mjs.
+import '../styles/visual-assault.css';
+
+// Strict from day one: nothing but our own origin, no inline script or style, no third parties.
+// Applied to production builds only so the dev server's hot reload keeps working.
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self'",
+  "img-src 'self' blob: data:",
+  "media-src 'self' blob:",
+  "worker-src 'self' blob:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join('; ');
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KVGrainy: make your images more grainy</title>
+    <meta
+      name="description"
+      content="Get the best-looking version of an image that fits under the size you choose. It all runs in your browser; your image is never uploaded."
+    />
+    <meta name="robots" content="noindex" />
+    {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
+    <script is:inline src="/theme-init.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <!-- The page's one h1: the logo with the tagline under it. -->
+      <h1 class="brandbox">
+        <a class="brand" href="/">KV<span>Grainy</span></a>
+        <span class="tagline">Make your images more grainy.</span>
+      </h1>
+      <div class="themes" role="group" aria-label="Theme">
+        <button type="button" data-theme-choice="dark" aria-pressed="true">Dark</button>
+        <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-choice="neon" aria-pressed="false">Neon</button>
+        <!-- The fourth choice is a dropdown of the Visual Assault themes; the script fills it in. -->
+        <span class="more-themes"><select id="theme-more" aria-label="More themes (Visual Assault)"></select></span>
+      </div>
+    </header>
+
+    <main>
+      <div class="tabs modes" role="tablist" aria-label="Mode">
+        <button type="button" role="tab" id="mode-reduce" aria-controls="panel-mode-reduce" aria-selected="true">Reduce</button>
+        <button type="button" role="tab" id="mode-tune" aria-controls="panel-mode-tune" aria-selected="false" tabindex="-1">Fine-Tune GIF</button>
+      </div>
+
+      <div id="panel-mode-reduce" role="tabpanel" aria-labelledby="mode-reduce">
+        <div id="reduce-size"></div>
+
+        <section class="controls" aria-label="Settings">
+          <div class="field">
+            <label for="format">Format</label>
+            <select id="format">
+              <option value="">Auto (best fit)</option>
+              <option value="jpeg">JPEG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WebP</option>
+              <option value="avif">AVIF</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="effort">Effort</label>
+            <select id="effort">
+              <option value="quick">Quick</option>
+              <option value="best">Best (also tries AVIF; slower)</option>
+            </select>
+          </div>
+        </section>
+
+        <label id="drop" class="drop" tabindex="0">
+          <input id="file" type="file" accept="image/*,video/*" multiple hidden />
+          <strong>Drop images, GIFs or short clips here</strong>
+          <span>or paste, or click to choose. GIFs and clips come out as GIFs, or as animated WebP if you pick WebP.</span>
+        </label>
+
+        <section id="jobs" class="jobs" aria-label="Your files" hidden>
+          <div class="tabs" role="tablist" aria-label="Files">
+            <button type="button" role="tab" id="tab-queue" aria-controls="panel-queue" aria-selected="true">
+              Queue <span class="count" id="count-queue">0</span>
+            </button>
+            <button type="button" role="tab" id="tab-finished" aria-controls="panel-finished" aria-selected="false" tabindex="-1">
+              Finished <span class="count" id="count-finished">0</span>
+            </button>
+          </div>
+          <div role="tabpanel" id="panel-queue" aria-labelledby="tab-queue">
+            <p id="empty-queue" class="empty">Nothing waiting. Drop more files above.</p>
+            <ol id="queue-list" class="results" aria-live="polite"></ol>
+          </div>
+          <div role="tabpanel" id="panel-finished" aria-labelledby="tab-finished" hidden>
+            <div class="panel-bar">
+              <p class="empty">Results stay only in this tab, in memory. Closing or refreshing the page clears them, so download what you want to keep.</p>
+              <button type="button" id="clear-finished" class="btn">Clear finished</button>
+            </div>
+            <p id="empty-finished" class="empty">Nothing finished yet.</p>
+            <ol id="finished-list" class="results"></ol>
+          </div>
+        </section>
+      </div>
+
+      <div id="panel-mode-tune" role="tabpanel" aria-labelledby="mode-tune" hidden>
+        <p class="lede">
+          Shape GIFs by hand. Add up to 20 animated GIFs, WebPs or short clips, choose what to give up first and how far to
+          slide between the best that fits and the most compressed, then run them all with those settings.
+        </p>
+
+        <div class="settings">
+        <section class="tune-box tune-controls" aria-label="Controls">
+          <label class="radio check">
+            <input type="checkbox" id="tune-shared" checked />
+            Same settings for every file
+          </label>
+          <p id="tune-shared-note" class="detail">Size, priority and quality apply to all files. Untick to set them for each file on its own.</p>
+          <div id="tune-size"></div>
+          <div class="field">
+            <label for="tune-priority">Priority</label>
+            <select id="tune-priority"></select>
+          </div>
+          <div class="field">
+            <label for="tune-quality">Quality</label>
+            <input id="tune-quality" type="range" min="0" max="100" step="1" value="100" disabled />
+            <div class="slider-labels">
+              <span>More compressed</span>
+              <span id="tune-max-label">Max (best that fits limit)</span>
+            </div>
+          </div>
+        </section>
+        </div>
+
+        <!-- The big drop zone lives here until a file is added, then moves into the file list as a small strip. -->
+        <div id="tune-drop-home">
+        <label id="tune-drop" class="drop" tabindex="0">
+          <input id="tune-input" type="file" accept="image/gif,image/webp,image/png,video/*,.gif,.mp4,.m4v,.mov,.webm,.mkv,.avi" multiple hidden />
+          <strong id="tune-drop-title">Drop GIFs or short clips here</strong>
+          <span id="tune-drop-hint">or paste, or click to choose. Nothing runs until you press Run on all.</span>
+        </label>
+        </div>
+
+        <p id="tune-notice" class="note bad" role="status" hidden></p>
+
+        <div class="review" hidden>
+          <div class="review-main">
+        <section id="tune-video" class="tune-box tune-video" aria-label="Clip options" hidden>
+          <div class="field">
+            <label for="tune-fps">Frames per second</label>
+            <input id="tune-fps" type="text" value="12" inputmode="decimal" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="tune-start">Start (seconds)</label>
+            <input id="tune-start" type="text" value="0" inputmode="decimal" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="tune-end">End (seconds)</label>
+            <input id="tune-end" type="text" value="" inputmode="decimal" autocomplete="off" />
+          </div>
+          <button type="button" id="tune-reload" class="btn">Reload clip</button>
+        </section>
+        <section class="tune-box" aria-label="Preview">
+          <div id="tune-pager" class="pager" hidden>
+            <button type="button" id="tune-prev" class="btn" aria-label="Previous file">‹ Prev</button>
+            <span id="tune-position" aria-live="polite">1 of 1</span>
+            <button type="button" id="tune-next" class="btn" aria-label="Next file">Next ›</button>
+          </div>
+          <p id="tune-file" class="tune-file">Nothing selected. Click a file in the list to preview it here.</p>
+          <div id="tune-preview" class="tune-preview">
+            <p class="empty">Add a GIF to preview it here.</p>
+          </div>
+          <p id="tune-info" class="detail" role="status"></p>
+          <p id="tune-busy" class="note" role="status" hidden>Recalculating…</p>
+          <div class="row">
+            <a id="tune-save" class="btn primary" aria-disabled="true">Save this GIF</a>
+          </div>
+        </section>
+          </div>
+        <section id="tune-batch" class="tune-box" aria-label="Files to run" hidden>
+          <div id="tune-drop-list-slot"></div>
+          <div class="panel-bar">
+            <p id="tune-count" class="empty"></p>
+            <div class="row">
+              <button type="button" id="tune-run" class="btn primary">Run on all</button>
+              <button type="button" id="tune-cancel" class="btn" hidden>Cancel</button>
+              <button type="button" id="tune-zip" class="btn" hidden>Download all (.zip)</button>
+              <button type="button" id="tune-clear" class="btn">Clear all</button>
+            </div>
+          </div>
+          <p id="tune-run-note" class="detail"></p>
+          <ol id="tune-list" class="tune-list"></ol>
+        </section>
+        </div>
+
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        An early build. Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels,
+        so EXIF and GPS data are always dropped.
+      </p>
+    </footer>
+
+    <script>
+      import '../ui/main';
+    </script>
+  </body>
+</html>

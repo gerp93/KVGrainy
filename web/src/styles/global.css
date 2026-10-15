@@ -1,0 +1,848 @@
+:root {
+  color-scheme: dark;
+  --bg: #0e0f14;
+  --surface: #171a23;
+  --surface-2: #1f2330;
+  --border: #2c3142;
+  --text: #e8eaf0;
+  --muted: #9aa1b2;
+  --accent: #8aa4ff;
+  --accent-ink: #0b0d14;
+  --danger: #ff7a7a;
+  --ok: #6fe0a0;
+  --radius: 12px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef0f6;
+  --border: #d5d9e4;
+  --text: #171a23;
+  --muted: #596074;
+  --accent: #3454d1;
+  --accent-ink: #ffffff;
+  --danger: #c0322f;
+  --ok: #1a7f4b;
+}
+
+:root[data-theme='neon'] {
+  color-scheme: dark;
+  --bg: #07040f;
+  --surface: #110a22;
+  --surface-2: #1a0f33;
+  --border: #3a1d6e;
+  --text: #f1e9ff;
+  --muted: #a591d1;
+  --accent: #19f0ff;
+  --accent-ink: #04060c;
+  --danger: #ff4d8d;
+  --ok: #5dff9b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Author styles like .btn { display: inline-flex } would otherwise beat the browser's own hidden rule. */
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.top,
+main,
+footer {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  padding-bottom: 8px;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+}
+.brand span {
+  color: var(--accent-text, var(--accent));
+}
+
+/* The h1 holds the logo with the tagline as small subtext under it. */
+.brandbox {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: inherit;
+  line-height: 1.15;
+  letter-spacing: normal;
+}
+.tagline {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.themes {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.themes button {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.themes button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+main {
+  flex: 1;
+  padding-top: 16px;
+  padding-bottom: 32px;
+}
+
+h1 {
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 8px 0 8px;
+}
+
+.lede {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+.lede strong {
+  color: var(--text);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+input[type='text'],
+select {
+  width: 100%;
+  min-height: 44px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.chips button {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.chips button:hover {
+  border-color: var(--accent);
+}
+.chips button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.presets {
+  margin-bottom: 16px;
+}
+.presets-title {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.presets .chips {
+  margin-top: 0;
+}
+.preset-note {
+  margin: 8px 0 0;
+}
+.preset-note a {
+  color: var(--link, var(--accent));
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  margin: 6px 0 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 160px;
+  text-align: center;
+  padding: 24px 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.drop span {
+  color: var(--muted);
+}
+.drop:hover,
+.drop.over {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.jobs {
+  margin-top: 24px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tabs [role='tab'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tabs [role='tab'][aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tabs .count {
+  min-width: 1.6em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+.tabs [aria-selected='true'] .count {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.modes {
+  margin: 0 0 16px;
+}
+
+.tune-box {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.tune-box[hidden] {
+  display: none;
+}
+.tune-file {
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.tune-video {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.tune-controls {
+  display: grid;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .tune-video {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.inline input[type='text'] {
+  width: 8em;
+}
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--text);
+}
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+input[type='range'] {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--accent);
+}
+.tune-preview {
+  display: flex;
+  justify-content: center;
+  min-height: 80px;
+  background: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--surface) 0% 50%) 50% / 20px 20px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tune-preview img {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+}
+.tune-preview .empty {
+  align-self: center;
+  margin: 0;
+}
+a.btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty {
+  color: var(--muted);
+  margin: 16px 0 0;
+}
+
+.panel-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+.panel-bar .empty {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.panel-bar[hidden],
+.card-x[hidden] {
+  display: none;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-x {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -4px -4px 0 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.card-x:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.results {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.card h2 {
+  font-size: 1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.card .meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 2px 0 10px;
+}
+.card .stats {
+  margin: 12px 0 0;
+  font-weight: 600;
+}
+.card .stats .saved {
+  color: var(--ok);
+}
+.card .detail {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 2px 0 0;
+}
+.card .note {
+  margin: 8px 0 0;
+}
+.card .note.bad {
+  color: var(--danger);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.progress {
+  flex: 1 1 200px;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress > div {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.compare {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--ratio, 4 / 3);
+  max-height: 70vh;
+  border-radius: 8px;
+  overflow: hidden;
+  background:
+    repeating-conic-gradient(var(--surface-2) 0% 25%, var(--surface) 0% 50%) 50% / 20px 20px;
+  user-select: none;
+}
+.compare img,
+.compare video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.compare .after {
+  clip-path: inset(0 0 0 var(--pos, 50%));
+}
+.compare .handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos, 50%);
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.compare .tag {
+  position: absolute;
+  top: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+  pointer-events: none;
+}
+.compare .tag.l {
+  left: 8px;
+}
+.compare .tag.r {
+  right: 8px;
+}
+.compare input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+footer {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding-top: 16px;
+  padding-bottom: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* ---- Shared size box, Fine-Tune batch list and pager ---- */
+.sizebox {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sizebox .presets {
+  margin-bottom: 0;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.tune-controls .detail {
+  margin: -8px 0 0;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.pager .btn {
+  min-width: 5.5em;
+}
+
+.tune-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.tune-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.tune-row.current {
+  border-color: var(--accent);
+}
+.tune-pick {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.tune-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tune-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.tune-status.bad {
+  color: var(--danger);
+}
+.tune-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+}
+.tune-actions .btn {
+  min-height: 32px;
+  padding: 2px 12px;
+}
+
+/* ---- Fine-Tune GIF tab only: wider page, drop zone beside the settings, pairs side by side ---- */
+@media (min-width: 1080px) {
+  html[data-mode='tune'] .top,
+  html[data-mode='tune'] main,
+  html[data-mode='tune'] footer {
+    max-width: 1180px;
+  }
+}
+
+.workbench {
+  display: grid;
+  gap: 16px;
+}
+.settings {
+  min-width: 0;
+  /* Inner rows adapt to this box, not the window, so they stay roomy when the drop zone takes a column. */
+  container-type: inline-size;
+}
+.tune-controls .sizebox {
+  margin-bottom: 0;
+}
+/* The settings box and the drop zone are a pair: same top edge, same height. The spacing above them goes on the pair,
+   not on the settings box alone, or the stretched drop zone would also cover that margin and stand taller. */
+#panel-mode-tune .settings {
+  margin-top: 12px;
+}
+.settings > .tune-box {
+  margin-top: 0;
+}
+@media (min-width: 1000px) {
+  .workbench {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 24px;
+    align-items: stretch;
+  }
+  .workbench > .drop {
+    min-height: 0;
+  }
+}
+@container (min-width: 640px) {
+  /* Max size beside the common limits, and Priority beside Quality under it. The left column is a little wider
+     because Priority's labels are long; both rows share the split. */
+  #panel-mode-tune .sizebox,
+  .tune-controls {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    column-gap: 32px;
+    align-items: start;
+  }
+  .tune-controls > .check,
+  .tune-controls > .detail,
+  .tune-controls > #tune-size {
+    grid-column: 1 / -1;
+  }
+  .tune-controls select {
+    font-size: 0.9rem;
+  }
+}
+
+/* ---- Fine-Tune: the preview and the file list side by side on regular screens, stacked on small ones ---- */
+.review {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.review > .tune-box,
+.review-main > .tune-box {
+  margin-top: 0;
+}
+.review-main {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  align-content: start;
+}
+.review > .tune-box {
+  min-width: 0;
+}
+@media (min-width: 1000px) {
+  .review {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 24px;
+    align-items: start;
+  }
+}
+
+/* ---- A small still picture on each file row ---- */
+.tune-thumb {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin-left: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.tune-thumb canvas,
+.tune-thumb video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tune-thumb:empty {
+  visibility: hidden; /* keep the row from shifting while the picture is still being made */
+}
+
+/* ---- Fine-Tune: empty state is just the settings and a big drop zone; with files it shrinks into the list ---- */
+#tune-drop-home {
+  margin-top: 12px;
+}
+#tune-drop-home .drop {
+  min-height: 260px;
+}
+#tune-notice {
+  margin: 12px 0 0;
+}
+.drop.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-height: 0;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+}
+
+/* ---- The theme switcher's fourth segment: a dropdown of the Visual Assault themes ---- */
+.more-themes {
+  position: relative;
+  display: inline-flex;
+  border-left: 1px solid var(--border);
+}
+.more-themes select {
+  appearance: none;
+  width: auto;
+  min-height: 0;
+  padding: 6px 28px 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.more-themes::after {
+  content: '▾';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+.more-themes.active select {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.more-themes.active::after {
+  color: var(--accent-ink);
+}
+.more-themes select option,
+.more-themes select optgroup {
+  background: var(--surface);
+  color: var(--text);
+}
