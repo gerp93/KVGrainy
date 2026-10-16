@@ -10,7 +10,7 @@ use kvgrainy_core::score::Reference;
 use kvgrainy_core::search::{optimize_with, Options};
 use kvgrainy_core::{Encoder, Format};
 
-pub mod proxy;
+pub use kvgrainy_core::proxy;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

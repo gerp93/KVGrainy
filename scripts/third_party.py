@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Regenerate THIRD_PARTY.md from `cargo metadata`.
+
+usage: python scripts/third_party.py > THIRD_PARTY.md
+
+Lists the Rust crates in the runtime dependency closure of kvgrainy-core and kvgrainy-cli.
+The hand-written header below holds the compatibility notes; edit them here, not in the output.
+"""
+import json
+import subprocess
+
+ROOT_CRATES = {"kvgrainy-core", "kvgrainy-cli"}
+
+HEADER = """# Third-party licences
+
+KVGrainy is licensed under the GNU Affero General Public License v3.0 (see `LICENSE`).
+
+This file lists the Rust crates compiled into `kvgrainy-core` and `kvgrainy-cli` (the runtime
+dependency closure, all targets, with default features). It is generated from `cargo metadata`;
+regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changing dependencies.
+
+## Compatibility notes
+
+- Every licence below is compatible with distributing the combined work under AGPL-3.0.
+- **MPL-2.0** (`avif-parse`): file-level copyleft, used unmodified; MPL-2.0 permits combination with AGPL-3.0.
+- **`r-efi`** is offered under `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; KVGrainy uses it under MIT.
+- **mozjpeg** (`IJG AND Zlib AND BSD-3-Clause`) and **libwebp** (BSD-3-Clause) are C libraries built from source by their `-sys` crates on native targets only.
+- Not yet included: the Tauri shell, the web app's npm packages, and any bundled ffmpeg. Add them here when they ship (ffmpeg builds must be LGPL-configured or the combination documented).
+
+## Crates
+
+| Crate | Version | Licence |
+|---|---|---|"""
+
+
+def main() -> None:
+    meta = json.loads(subprocess.check_output(["cargo", "metadata", "--format-version", "1", "--locked"]))
+    packages = {p["id"]: p for p in meta["packages"]}
+    nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
+    stack = [p["id"] for p in meta["packages"] if p["name"] in ROOT_CRATES]
+    seen: set[str] = set()
+    while stack:
+        pkg = stack.pop()
+        if pkg in seen:
+            continue
+        seen.add(pkg)
+        for dep in nodes[pkg]["deps"]:
+            if any(kind["kind"] in (None, "normal") for kind in dep["dep_kinds"]):
+                stack.append(dep["pkg"])
+    rows = sorted(
+        (packages[i]["name"], packages[i]["version"], packages[i].get("license") or "UNSPECIFIED")
+        for i in seen
+        if not packages[i]["name"].startswith("kvgrainy")
+    )
+    print(HEADER)
+    for name, version, licence in rows:
+        print(f"| {name} | {version} | {licence} |")
+
+
+if __name__ == "__main__":
+    main()

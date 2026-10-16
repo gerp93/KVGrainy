@@ -4,7 +4,7 @@
 //! [`ProxyKind::Blended`] is a port of `web/src/engine/metric.ts` (luma SSIM + chroma
 //! error + block-averaged colour). [`ProxyKind::LumaSsim`] is luma SSIM alone.
 
-use kvgrainy_core::raster::Raster;
+use crate::raster::Raster;
 
 const WINDOW: usize = 8;
 const STRIDE: usize = 4;

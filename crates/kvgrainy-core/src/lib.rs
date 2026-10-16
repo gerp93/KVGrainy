@@ -12,6 +12,7 @@ pub mod limit;
 pub mod load;
 #[cfg(feature = "native")]
 pub mod native;
+pub mod proxy;
 pub mod raster;
 pub mod score;
 pub mod search;
@@ -21,5 +22,5 @@ pub use limit::parse_size_limit;
 #[cfg(feature = "native")]
 pub use native::NativeEncoder;
 #[cfg(feature = "native")]
-pub use search::optimize;
-pub use search::{optimize_with, Candidate, Error, Options, Progress};
+pub use search::{best_effort, optimize};
+pub use search::{best_effort_with, optimize_with, Candidate, Effort, Error, Options, Progress};

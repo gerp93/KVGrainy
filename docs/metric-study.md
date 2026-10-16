@@ -110,3 +110,26 @@ node crates/kvgrainy-wasm-spike/capped.mjs path/to/photo.jpg 60
 
 The per-image CSVs (`*-records.csv`, `*-candidates.csv`) are written under `target/` and not
 committed.
+
+## Applied in the engine (Phase 2.1)
+
+`kvgrainy-core` now scores on a copy capped at 1 MP (`score::SCORE_CAP_PIXELS`). The search ranks the
+candidates of one format with the luma-SSIM proxy and verifies each format's best with
+SSIMULACRA2 at the cap, so the expensive score runs once per format instead of once per candidate.
+Quality probes run three at a time when the `parallel` feature is on (a fixed set per round, so
+output does not depend on core count) and one at a time otherwise. A lossless candidate is skipped
+when it cannot fit at the current scale. `Effort::Quick` (CLI `--quick`) leaves AVIF out.
+
+Measured on 10 of the photos (2 at 12 MP, 8 at 3 MP), limit 100 KB, same machine, whole run:
+
+| engine | wall time | mean SSIMULACRA2 vs old engine |
+|---|---|---|
+| before (full-resolution scoring, bisection) | 9 min 02 s | n/a |
+| capped scoring + proxy ranking | 8 min 09 s | -0.05 points |
+| + parallel quality probes, lossless skip | 5 min 40 s | -0.05 points |
+| + `--quick` (no AVIF) | 36 s | about -4 points (AVIF wins by 4 to 5 on 3 MP photos) |
+
+Outputs were scored with SSIMULACRA2 at a 4 MP cap, which the study shows matches full resolution.
+Every photo's new score is within 0.8 points of the old engine's. The 12 MP photos still take the
+longest: AVIF encoding, not scoring, is now the cost, so a faster AVIF setting or a smaller probe
+for the search is the next lever.
