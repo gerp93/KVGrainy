@@ -109,6 +109,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else addUpdateButton();
 
 export const shell: Shell = {
+  nativeAnimation: true,
   onOpenFiles(callback) {
     const open = async (paths: string[]) => {
       try {

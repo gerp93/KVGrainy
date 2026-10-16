@@ -7,6 +7,8 @@
 //! Codecs sit behind the [`Encoder`] trait. [`NativeEncoder`] is the default
 //! (feature `native`); [`search::optimize_with`] takes any other implementation.
 
+#[cfg(feature = "animation")]
+pub mod animated;
 pub mod encode;
 pub mod limit;
 pub mod load;

@@ -26,6 +26,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 - Every licence below is compatible with distributing the combined work under AGPL-3.0.
 - **MPL-2.0** (`avif-parse`, and `cssparser`, `dtoa-short` and friends through Tauri's HTML handling): file-level copyleft, used unmodified; MPL-2.0 permits combination with AGPL-3.0.
 - **GPL-3.0-or-later** (`imagequant`, palette PNG): GPLv3 section 13 allows combining it with AGPL-3.0, which KVGrainy is. Anyone distributing KVGrainy as a whole must follow the AGPL-3.0, which this licence permits. It also means KVGrainy cannot be relicensed under a more permissive licence while it includes imagequant.
+- **AGPL-3.0-or-later** (`gifski`, animated GIF output): the same licence family as KVGrainy's AGPL-3.0, so combining them is permitted and the combined work stays AGPL-3.0.
 - **`r-efi`** is offered under `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; KVGrainy uses it under MIT.
 - **mozjpeg** (`IJG AND Zlib AND BSD-3-Clause`) and **libwebp** (BSD-3-Clause) are C libraries built from source by their `-sys` crates on native targets only.
 - **Tauri** (the desktop shell, `desktop/`) is MIT OR Apache-2.0; its Linux builds link WebKitGTK (LGPL) dynamically, as a system library, and Windows uses the system WebView2.

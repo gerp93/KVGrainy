@@ -7,15 +7,19 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-default = ["native", "parallel", "extra-formats"]
+default = ["native", "parallel", "extra-formats", "animation"]
 # The C-backed codec set (mozjpeg, libwebp, rav1e, libaom) behind `NativeEncoder`.
 # Turn off for targets that cannot build C code, such as wasm32; supply an `Encoder` instead.
 native = ["dep:mozjpeg", "dep:webp", "dep:ravif", "dep:avif-decode", "dep:imgref", "dep:rgb", "dep:imagequant", "dep:png", "dep:oxipng"]
 # Decode GIF, BMP and TIFF inputs. A browser build leaves these out (the browser decodes inputs
 # itself; Rust only decodes its own JPEG/WebP/PNG outputs), which saves about 80 KB gzipped of WASM.
 extra-formats = ["image/gif", "image/bmp", "image/tiff"]
+# Animated GIF output via gifski (pure Rust): frame loading, encoding and the size search (src/animated.rs).
+# Left out of the browser build, which has its own TypeScript GIF search.
+animation = ["dep:gifski", "dep:imgref", "dep:rgb", "image/gif"]
 # Search formats on a rayon thread pool. Off, the search runs on the calling thread.
 parallel = ["dep:rayon"]
+gifski = ["dep:gifski"]
 
 [dependencies]
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
@@ -34,3 +38,4 @@ rayon = { version = "1", optional = true }
 imagequant = { version = "4.4.1", default-features = false, optional = true }
 png = { version = "0.18.1", optional = true }
 oxipng = { version = "10", default-features = false, optional = true }
+gifski = { version = "1.34", default-features = false, optional = true }

@@ -387,7 +387,7 @@ const LOG_SIZE_PER_QUALITY: f64 = 0.045;
 
 /// The quality most likely to land just under `limit`, interpolating between a known fit and a
 /// known miss, or extrapolating from one of them, in log-size.
-fn guess_quality(limit: u64, fit: Option<(u8, u64)>, miss: Option<(u8, u64)>, lo: u8, hi: u8) -> u8 {
+pub(crate) fn guess_quality(limit: u64, fit: Option<(u8, u64)>, miss: Option<(u8, u64)>, lo: u8, hi: u8) -> u8 {
     let ln = |bytes: u64| (bytes.max(1) as f64).ln();
     let target = ln(limit);
     let guess = match (fit, miss) {

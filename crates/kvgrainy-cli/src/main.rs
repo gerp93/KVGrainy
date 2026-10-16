@@ -2,9 +2,10 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
+use kvgrainy_core::animated::{best_effort_gif, load_animation, optimize_gif, AnimationError, GifOptions};
 use kvgrainy_core::{best_effort, load::load_image, optimize, parse_size_limit, Effort, Error, Format, Options};
 
-const IMAGE_EXTENSIONS: [&str; 7] = ["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif"];
+const IMAGE_EXTENSIONS: [&str; 8] = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tiff", "tif"];
 
 /// Reduce images to fit under a size limit with the best quality possible.
 #[derive(Parser)]
@@ -57,6 +58,52 @@ fn collect(paths: &[PathBuf]) -> Vec<PathBuf> {
     files
 }
 
+/// Animated GIF, WebP and PNG files are fitted as GIFs. `None` means the file is a still, for the normal path.
+fn try_animation(file: &Path, limit: u64, output: &Path) -> Option<bool> {
+    let name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let bytes = std::fs::read(file).ok()?;
+    let animation = match load_animation(&bytes) {
+        Err(AnimationError::NotAnimated) => return None,
+        Err(why) => {
+            eprintln!("[fail] {name}: {why}");
+            return Some(false);
+        }
+        Ok(animation) => animation,
+    };
+    let stem = file.file_stem().unwrap_or_default().to_string_lossy();
+    let out = output.join(format!("{stem}_optimized.gif"));
+    let write = |bytes: &[u8]| std::fs::write(&out, bytes);
+    match optimize_gif(&animation, &GifOptions { limit_bytes: limit, cancel: None }, &|_| {}) {
+        Ok(best) => {
+            if let Err(why) = write(&best.bytes) {
+                eprintln!("[fail] {name}: cannot write {}: {why}", out.display());
+                return Some(false);
+            }
+            println!(
+                "[done] {name} -> {} | {:.1}KB | fmt=Gif quality={} scale={:.2} frame-step={} score={:.3}",
+                out.file_name().unwrap_or_default().to_string_lossy(),
+                best.bytes.len() as f64 / 1024.0,
+                best.settings.quality,
+                best.settings.scale,
+                best.settings.frame_step,
+                best.score
+            );
+            Some(true)
+        }
+        Err(why @ AnimationError::NothingFits { .. }) => {
+            match best_effort_gif(&animation).and_then(|fallback| write(&fallback.bytes).map(|()| fallback.bytes.len()).map_err(|e| AnimationError::Encode(e.to_string()))) {
+                Ok(size) => eprintln!("[over limit] {name}: {why}. Wrote the smallest possible instead: {} ({:.1}KB)", out.file_name().unwrap_or_default().to_string_lossy(), size as f64 / 1024.0),
+                Err(_) => eprintln!("[fail] {name}: {why}"),
+            }
+            Some(false)
+        }
+        Err(why) => {
+            eprintln!("[fail] {name}: {why}");
+            Some(false)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args = Args::parse();
     let limit = match parse_size_limit(&args.limit) {
@@ -87,6 +134,14 @@ fn main() -> ExitCode {
     let mut failures = 0;
     for file in &files {
         let name = file.file_name().unwrap_or_default().to_string_lossy();
+        if matches!(file.extension().and_then(|e| e.to_str()).map(str::to_lowercase).as_deref(), Some("gif" | "webp" | "png")) {
+            if let Some(succeeded) = try_animation(file, limit, &args.output) {
+                if !succeeded {
+                    failures += 1;
+                }
+                continue;
+            }
+        }
         let loaded = match load_image(file) {
             Ok(loaded) => loaded,
             Err(why) => {
