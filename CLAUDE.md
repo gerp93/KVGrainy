@@ -33,7 +33,8 @@ KVGrainy is one search engine with three front ends:
 - **`crates/kvgrainy-core`**: the engine. For a size limit it searches `(format, scale, quality)` for the
   best-scoring candidate that fits, scoring with SSIMULACRA2 on a 1 MP copy. Codecs sit behind an `Encoder`
   trait; native builds use mozjpeg, libwebp, rav1e (AVIF), imagequant and oxipng, and the browser build
-  supplies WASM codecs from JavaScript. Stills only.
+  supplies WASM codecs from JavaScript. Stills only. For a source over 3 MP the full-size floor encode is measured in
+  strips, to bound memory (docs/web.md, "Memory").
 - **`crates/kvgrainy-cli`**: the command line over the core.
 - **`crates/kvgrainy-wasm`**: the core compiled to WebAssembly for the web tool.
 - **`web/`**: the static site (Astro + TypeScript). One Web Worker per output format; the privacy claim is

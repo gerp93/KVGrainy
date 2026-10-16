@@ -26,9 +26,12 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet. The plan the
 
 ## Verification gaps
 
-- Browser memory: a 12 MP photo peaks near 2.4 GB and a 24 MP photo (the current cap) near 3.6 GB in desktop Chromium
-  (docs/web.md). Try a real iPhone and an Android phone; if they crash, search on a downscaled copy instead of holding
-  full-resolution pixels in every format worker, rather than only lowering the cap.
+- Browser memory on a real phone: the strip probe and one-worker-at-a-time mode cut desktop Chromium's peak for a 12 MP photo
+  from 2.4 GB to 1.3 GB and for 24 MP from 3.6 GB to 1.4 GB (docs/web.md, "Memory"), but no phone has been tried. Run a 12 MP and a
+  24 MP photo on an iPhone and an Android phone. If a tab still dies, the remaining cost is per-worker scoring memory (about 240 MB)
+  and pixel copies; the next steps are a smaller scoring copy (which changes scores, so it needs the benchmark) or lowering the cap.
+- Run `scripts/benchmark.py` with the ten real phone photos against the previous binary to confirm the strip probe changes no output
+  there either (it did not on 20 combinations of one real photo and synthetic images).
 
 - Safari, Firefox and phones for the web tool; only Chromium is tested. Large-photo memory limits.
 - macOS and Linux desktop builds, a real right-click in Explorer, and the native Save dialog. (The NSIS installer, its registry entries, the installed app and the uninstall were verified on Windows; see docs/desktop.md.)

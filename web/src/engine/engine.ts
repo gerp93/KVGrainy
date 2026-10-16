@@ -1,4 +1,5 @@
 import type { FrameSource } from './frames';
+import { readDeviceHints, workerLimit } from './parallelism';
 import { SCALE_FACTORS, chooseBest, formatsFor, type Effort } from './search';
 import type { Format, FormatResult, OptimizeResult, Raster } from './types';
 import type { FromWorker, ToWorker } from './worker';
@@ -53,7 +54,8 @@ function hasTransparency(data: Uint8ClampedArray): boolean {
 
 /**
  * Search for the best version of `source` under `options.limit` bytes. One Web Worker per
- * format, run in parallel. Aborting `signal` stops the workers and rejects with an AbortError.
+ * format, run in parallel (one at a time for a large image on a constrained device: parallelism.ts).
+ * Aborting `signal` stops the workers and rejects with an AbortError.
  */
 export function optimizeImage(
   source: Source,
@@ -79,7 +81,16 @@ export function optimizeImage(
     if (signal.aborted) return fail(new DOMException('Cancelled', 'AbortError'));
     signal.addEventListener('abort', () => fail(new DOMException('Cancelled', 'AbortError')), { once: true });
 
-    for (const format of formats) {
+    // Normally every format runs at once. A large image on a phone or low-memory device runs them one after
+    // another instead (see parallelism.ts): the same result, a bounded memory peak, more time.
+    const limit = workerLimit(source.raster.width * source.raster.height, formats.length, readDeviceHints());
+    const pending = [...formats];
+    const launchNext = () => {
+      const next = pending.shift();
+      if (next !== undefined && !settled) launch(next);
+    };
+
+    const launch = (format: Format) => {
       const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
       workers.push(worker);
       worker.onmessage = (event: MessageEvent<FromWorker>) => {
@@ -94,6 +105,8 @@ export function optimizeImage(
             settled = true;
             onProgress(1);
             resolve(chooseBest(results, options.limit));
+          } else {
+            launchNext();
           }
         } else if (msg.type === 'error') {
           fail(new Error(msg.message));
@@ -112,7 +125,9 @@ export function optimizeImage(
         data: copy,
       };
       worker.postMessage(message, [copy]);
-    }
+    };
+
+    for (let started = 0; started < limit; started++) launchNext();
   });
 }
 
