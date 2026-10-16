@@ -16,6 +16,29 @@ Stack and priorities follow from that, not from the UI.
 **Non-goals:** a general-purpose image editor, cloud features, accounts, uploads
 to any server.
 
+## Status
+
+As of 2026-10-16. **Done** means built, tested and merged to `main`. **Partial** says what is missing. **Blocked** says
+what it waits for. Everything "Owner" is something only you can do. Evidence is in the linked docs; the unverified parts are
+listed in `TODO.md`.
+
+| Phase | State | Notes |
+|---|---|---|
+| **0** Reference engine, baseline | Done, one gap | 0.1 done. 0.2 corpus is synthetic plus ten private phone photos (not committed). 0.3 benchmark script exists; the competing tools are not installed, so 0.4's table is the synthetic one in `docs/benchmark-baseline.md` plus a real-photo comparison in `docs/benchmark-vs-manual.md`. |
+| **1** Engine spike | Done | 1.1 to 1.4 done and measured (`docs/engine-spike.md`, `docs/metric-study.md`). 1.3: real-browser search times on real photos are recorded (Chromium only; memory, Safari and phones are not). 1.5: the jSquash codecs are in the web app and tested; their per-codec timings are folded into those search times. 1.6: shared Rust core in WebAssembly, chosen by you. |
+| **2** Shared core | Done, one gap | 2.1 capped scoring, guided parallel search, Quick mode. 2.2 palette PNG. 2.3 colour tests. 2.4 best-effort file when nothing fits. 2.6 AGPL and `THIRD_PARTY.md`. 2.7 determinism test. 2.5: re-tuned and measured against the old engine and a hand-tuned baseline, **not** against the competing tools. Time budget not met for a 12 MP photo in Best (about 95 s on 24 threads); Quick is seconds. |
+| **3** Web MVP | Done, with gaps | Runs on the shared Rust core in WebAssembly (`docs/web.md`), CSP, privacy test, bundle budgets, web CI, 26 browser tests. Gaps: Chromium only; golden corpus covers photo, transparent, nothing-fits and cancel but not CMYK or rotated photos in the browser; no Squoosh or TinyPNG comparison. |
+| **4** Desktop | Mostly done | 4.1 Tauri shell on the shared UI, native core (`docs/desktop.md`). 4.2 native GIF with gifski (automatic mode; Fine-Tune GIF is still the TypeScript tuner; animated WebP output is TypeScript). 4.4 save, reveal, one-instance open-with, Explorer menu entries (installer never built or run); no clipboard copy. 4.5 theming decided. **4.3 video is not done:** it needs ffmpeg (not installed here), your choice of LGPL or GPL build, and about 80 MB of binary. |
+| **5** Distribution | Written, not proven | 5.1 release workflow for three OSes (never completed a real run before this status; see `docs/release.md`); **signing needs your certificates**. 5.2 self-update is a GitHub release check, because Tauri's updater cannot be built (every `zip` release it accepts is yanked). 5.3 smoke test in every build. 5.4 release filter. 5.5 manifests generated; publishing is yours. **5.6 Python app not retired**: waits for native video. |
+| **6** Content, SEO, ads | Done up to your accounts | 11 real pages, closed to search engines until `PUBLIC_LAUNCH=1`, ad rules enforced in code, Lighthouse 100 across the board. **Owner:** domain, hosting, analytics, ad network, consent tool, `ads.txt`. |
+| **7** Launch | Drafted | `docs/launch.md`: checklist, drafts, proposed stop-or-change numbers. **Owner:** every post, and the real numbers. |
+
+### What I could not do from here
+
+Buy or create anything (domain, Cloudflare, analytics, ads, code-signing and Apple accounts), post anywhere, run the
+competing encoders and services, test on Safari, Firefox, phones, macOS or Linux, or build and run the NSIS installer. Each
+is listed where it matters, with the exact next step.
+
 ## Target stack
 
 ```

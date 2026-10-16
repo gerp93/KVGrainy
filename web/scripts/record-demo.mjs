@@ -15,7 +15,7 @@ const tmp = join(out, '.tmp');
 rmSync(tmp, { recursive: true, force: true });
 mkdirSync(tmp, { recursive: true });
 
-const server = spawn('npx', ['astro', 'preview', '--host', '127.0.0.1', '--port', '4330'], { cwd: web, shell: true, stdio: 'ignore' });
+const server = spawn('npx', ['astro', 'preview', '--host', '127.0.0.1', '--port', '4330'], { cwd: web, shell: true, stdio: 'ignore', detached: false });
 try {
   for (let i = 0; i < 60; i++) {
     try {
@@ -41,6 +41,8 @@ try {
   renameSync(join(tmp, video), join(out, 'demo.webm'));
   console.log(`wrote ${join(out, 'demo.webm')}`);
 } finally {
-  server.kill();
+  // With shell:true on Windows, kill() only stops the shell; end the whole tree.
+  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(server.pid), '/t', '/f'], { stdio: 'ignore' });
+  else server.kill();
   rmSync(tmp, { recursive: true, force: true });
 }
