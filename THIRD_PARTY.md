@@ -12,6 +12,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 - Every licence below is compatible with distributing the combined work under AGPL-3.0.
 - **MPL-2.0** (`avif-parse`, and `cssparser`, `dtoa-short` and friends through Tauri's HTML handling): file-level copyleft, used unmodified; MPL-2.0 permits combination with AGPL-3.0.
 - **GPL-3.0-or-later** (`imagequant`, palette PNG): GPLv3 section 13 allows combining it with AGPL-3.0, which KVGrainy is. Anyone distributing KVGrainy as a whole must follow the AGPL-3.0, which this licence permits. It also means KVGrainy cannot be relicensed under a more permissive licence while it includes imagequant.
+- **AGPL-3.0-or-later** (`gifski`, animated GIF output): the same licence family as KVGrainy's AGPL-3.0, so combining them is permitted and the combined work stays AGPL-3.0.
 - **`r-efi`** is offered under `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; KVGrainy uses it under MIT.
 - **mozjpeg** (`IJG AND Zlib AND BSD-3-Clause`) and **libwebp** (BSD-3-Clause) are C libraries built from source by their `-sys` crates on native targets only.
 - **Tauri** (the desktop shell, `desktop/`) is MIT OR Apache-2.0; its Linux builds link WebKitGTK (LGPL) dynamically, as a system library, and Windows uses the system WebView2.
@@ -184,7 +185,10 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | generic-array | 0.14.7 | MIT |
 | getrandom | 0.3.4 | MIT OR Apache-2.0 |
 | getrandom | 0.4.3 | MIT OR Apache-2.0 |
+| gif | 0.13.3 | MIT OR Apache-2.0 |
 | gif | 0.14.2 | MIT OR Apache-2.0 |
+| gif-dispose | 5.0.1 | MIT OR Apache-2.0 |
+| gifski | 1.34.0 | AGPL-3.0-or-later |
 | gio | 0.18.4 | MIT |
 | gio-sys | 0.18.1 | MIT |
 | glib | 0.18.5 | MIT |
@@ -319,6 +323,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | once_cell_polyfill | 1.70.2 | MIT OR Apache-2.0 |
 | open | 5.4.4 | MIT |
 | option-ext | 0.2.0 | MPL-2.0 |
+| ordered-channel | 1.2.0 | MIT OR Apache-2.0 |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 |
 | owning_ref | 0.4.1 | MIT |
 | oxipng | 10.2.1 | MIT |
@@ -376,6 +381,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | regex-automata | 0.4.18 | MIT OR Apache-2.0 |
 | regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
 | reqwest | 0.13.5 | MIT OR Apache-2.0 |
+| resize | 0.8.9 | MIT |
 | rfd | 0.16.0 | MIT |
 | rgb | 0.8.53 | MIT |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
@@ -443,6 +449,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | thiserror | 2.0.21 | MIT OR Apache-2.0 |
 | thiserror-impl | 1.0.69 | MIT OR Apache-2.0 |
 | thiserror-impl | 2.0.21 | MIT OR Apache-2.0 |
+| thread_local | 1.1.10 | MIT OR Apache-2.0 |
 | tiff | 0.11.3 | MIT |
 | time | 0.3.55 | MIT OR Apache-2.0 |
 | time-core | 0.1.9 | MIT OR Apache-2.0 |
