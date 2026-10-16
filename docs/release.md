@@ -102,5 +102,8 @@ through the webview's TypeScript search, which covers the common cases but not `
 After a release finishes: download the installer for your OS, install it, and run
 `kvgrainy-desktop --smoke-test report.txt` (the report should end in `PASSED`); open the app and
 reduce an image; on Windows check that right-clicking an image shows "Reduce with KVGrainy".
-The first run of `release-desktop.yml` has never happened; expect to fix small things (Linux
-packaging dependencies and the signing steps are the likeliest).
+`release-desktop.yml` has completed one real run (release v1.0.29): all three OS bundles built, passed their smoke
+test and were uploaded, and the package manifests were generated and attached (`.msi`, NSIS `.exe`, `.dmg`, `.AppImage`,
+`.deb`, `.rpm`, `kvgrainy.scoop.json`, `kvgrainy.rb`, three winget YAMLs). Its first attempt failed on one config value
+(`bundle.category`), fixed in #39. **Not yet exercised:** the signing and notarization steps (no certificates), and
+installing the Linux, macOS and MSI packages on a real machine; only the Windows NSIS installer was installed and run.
