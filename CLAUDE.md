@@ -160,17 +160,11 @@ Both release triggers are active, per KVG_Standards convention:
 patch/minor/major bump, `default_bump: patch`), and `cut-release.yml` stays
 available in the Actions tab for a deliberately-numbered release
 (`workflow_dispatch`, explicit `vX.Y.Z` input) when you want one instead of
-the auto-bump. Both ultimately call
-[`gerp93/KVG_Standards`](https://github.com/gerp93/KVG_Standards)'s
-`release-python-gui.yml` reusable workflow, which runs the PyInstaller
-`--onefile --windowed` matrix across Linux, Windows, and macOS (writing
-`_version.py`, consumed by `updater.py`; bundling `LICENSE` and `assets/`
-via `--add-data`; embedding `assets/icon.ico`/`.icns` into the built
-executable via the `icon_path` input), then collects all three artifacts
-and cuts a GitHub Release tagged with that version — its body prepended
-with install instructions before the auto-generated changelog. See
-KVG_Standards' `README.md` for the shared workflow catalog — the
-build/release logic itself lives there now, not in this repo. To force a
+the auto-bump. Both call the local `release-desktop.yml`, which creates the
+GitHub Release and attaches the Tauri installers (see `docs/release.md`).
+**The Python app is no longer packaged in releases** (the PyInstaller
+`release-python-gui.yml` job was dropped); its source stays here as the
+reference engine, and `updater.py` has no new release assets to find. To force a
 release with no other code change, edit `VERSION_BUMP.md` instead of
 pushing an empty commit — `auto-release.yml` bumps on every push
 regardless of content.

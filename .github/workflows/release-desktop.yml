@@ -1,15 +1,15 @@
 name: Release desktop
 
 # Builds the Tauri desktop app on Windows, macOS (Apple silicon) and Linux, smoke-tests the packaged
-# binary, and attaches the installers to an existing GitHub release. Called by auto-release.yml and
-# cut-release.yml after the release exists. Code signing and notarization happen only when the
+# binary, and attaches the installers to the GitHub release for the tag, creating the release first
+# if it does not exist. Called by auto-release.yml and cut-release.yml. Code signing and notarization happen only when the
 # matching repository secrets are set; without them the installers are unsigned (SmartScreen and
 # Gatekeeper will warn) and say so. See docs/release.md for the secrets and how to get them.
 on:
   workflow_call:
     inputs:
       version:
-        description: 'Release tag, e.g. v1.2.3. The release must already exist.'
+        description: 'Release tag, e.g. v1.2.3. The tag must already exist; the release is created if missing.'
         required: true
         type: string
 
@@ -17,7 +17,33 @@ permissions:
   contents: write
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Create the release if it does not exist
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then exit 0; fi
+          cat > notes.md <<'EOF'
+          ## Install
+
+          Download the installer for your system below:
+
+          - **Windows:** `KVGrainy_*_x64-setup.exe` (or the `.msi`)
+          - **macOS (Apple silicon):** `KVGrainy_*_aarch64.dmg`
+          - **Linux:** `.AppImage`, `.deb` or `.rpm`
+
+          The installers are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper may warn on first launch.
+
+          ---
+          EOF
+          gh release create "$VERSION" --verify-tag --title "$VERSION" --notes-file notes.md --generate-notes
+
   bundle:
+    needs: release
     strategy:
       fail-fast: false
       matrix:

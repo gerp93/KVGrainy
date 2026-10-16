@@ -6,11 +6,14 @@ Every push to `main` that changes the product tags a new patch version and runs
 `.github/workflows/auto-release.yml`:
 
 1. **version**: bumps the tag (`v1.2.3`).
-2. **release**: the Python app, built by KVG_Standards' reusable workflow. It creates the GitHub
-   release. (Retired in PLAN.md 5.6, see below.)
-3. **desktop**: `release-desktop.yml` builds the Tauri app on Windows, macOS (Apple silicon) and
-   Linux, **smoke-tests the packaged binary**, and attaches the installers to that release. Then
-   it renders Scoop, winget and Homebrew manifests from the uploaded files and attaches those too.
+2. **desktop**: `release-desktop.yml` creates the GitHub release, builds the Tauri app on Windows,
+   macOS (Apple silicon) and Linux, **smoke-tests the packaged binary**, and attaches the installers
+   to the release. Then it renders Scoop, winget and Homebrew manifests from the uploaded files and
+   attaches those too.
+
+The Python app is no longer built or released. Its source is still in the repo (see below), and
+changes to it alone do not cut a release. Copies of the Python app already installed will not find
+newer releases, because those no longer carry its files.
 
 `cut-release.yml` does the same for a version you choose (Actions tab, "Run workflow").
 
@@ -88,14 +91,13 @@ exact installers and the workflow attaches them to each release:
 
 None of this was published or installed from here.
 
-## Retiring the Python app (PLAN.md 5.6): not done
+## Retiring the Python app (PLAN.md 5.6): packaging stopped, code not deleted
 
-The Python app (`gui.py`, `kvgrainy.py`, `theming.py`, `updater.py`) is still the shipped desktop
-app and `auto-release.yml` still builds it, because retiring it would regress things the Tauri app
-does not do yet: native GIF and video (PLAN.md 4.2 and 4.3). The Tauri app runs GIFs and clips
-through the webview's TypeScript search, which covers the common cases but not `.mkv` and `.avi`
-(WebView2 cannot decode them) and is slower. When those are native, delete the Python files and
-`requirements.txt`, drop the `release` job and its `needs`, and update the README and CLAUDE.md.
+Releases no longer package the Python app (`gui.py`, `kvgrainy.py`, `theming.py`, `updater.py`), but
+its source stays in the repo as the reference engine. Deleting it would regress video: PLAN.md 4.3
+(native video) is not done, so the Tauri app runs clips through the webview's TypeScript search,
+which covers the common cases but not `.mkv` and `.avi` (WebView2 cannot decode them) and is slower. When those are native, delete the Python files and
+`requirements.txt`, and update the README and CLAUDE.md.
 
 ## Verifying a release
 
