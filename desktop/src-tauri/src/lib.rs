@@ -5,6 +5,8 @@
 //! imagequant, oxipng) through the commands below, on all CPU cores. All logic stays in the core
 //! crate; this file only moves bytes, progress and cancellation across the IPC boundary.
 
+mod update;
+
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,7 +19,7 @@ use kvgrainy_core::{best_effort, optimize, Effort, Encoder, Error, Format, Nativ
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_dialog::DialogExt;
 
 /// Extensions the app opens from the command line (Explorer's "Reduce with KVGrainy", "Open with").
 const OPENABLE: [&str; 14] =
@@ -281,76 +283,10 @@ fn read_file(allowed: State<'_, Allowed>, path: String) -> Result<Response, Stri
     std::fs::read(&path).map(Response::new).map_err(|e| format!("could not read {path}: {e}"))
 }
 
-/// Where releases are published. The check reads the newest one and compares its tag with this build.
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/gerp93/KVGrainy/releases/latest";
-
-/// `major.minor.patch` from a tag such as `v1.2.3` (anything after a `-` or `+` is ignored).
-fn parse_version(text: &str) -> Option<(u64, u64, u64)> {
-    let core = text.trim().trim_start_matches('v').split(['-', '+']).next()?;
-    let mut parts = core.split('.').map(|p| p.parse::<u64>());
-    Some((parts.next()?.ok()?, parts.next()?.ok()?, parts.next()?.ok()?))
-}
-
-fn is_newer(latest: &str, current: &str) -> bool {
-    matches!((parse_version(latest), parse_version(current)), (Some(l), Some(c)) if l > c)
-}
-
-/// The newest release's tag and page, from GitHub.
-fn latest_release() -> Result<(String, String), String> {
-    let mut response = ureq::get(LATEST_RELEASE_API)
-        .header("User-Agent", concat!("kvgrainy-desktop/", env!("CARGO_PKG_VERSION")))
-        .header("Accept", "application/vnd.github+json")
-        .call()
-        .map_err(|e| e.to_string())?;
-    let release: serde_json::Value = response.body_mut().read_json().map_err(|e| e.to_string())?;
-    let tag = release["tag_name"].as_str().ok_or("the release has no tag")?.to_string();
-    let url = release["html_url"].as_str().ok_or("the release has no page")?.to_string();
-    Ok((tag, url))
-}
-
-/// Look for a newer release and offer to open its download page. `silent` is the start-up check:
-/// it says nothing unless there is a newer release.
-///
-/// This does not download or install anything. Tauri's own updater plugin would, but every
-/// version of it depends on a `zip` crate release that has been yanked, so it cannot be built
-/// right now (docs/release.md); installing from the release page keeps a human in the loop until then.
-async fn check_for_updates_inner(app: AppHandle, silent: bool) -> Result<(), String> {
-    let checked = tauri::async_runtime::spawn_blocking(latest_release).await.map_err(|e| e.to_string())?;
-    let (tag, url) = match checked {
-        Ok(found) => found,
-        Err(_) if silent => return Ok(()),
-        Err(error) => return Err(format!("could not check for updates: {error}")),
-    };
-    let current = app.package_info().version.to_string();
-    let dialog = app.clone();
-    if !is_newer(&tag, &current) {
-        if !silent {
-            let message = format!("You're running the latest version ({current}).");
-            let _ = tauri::async_runtime::spawn_blocking(move || dialog.dialog().message(message).title("Up to date").blocking_show()).await;
-        }
-        return Ok(());
-    }
-    let message = format!("KVGrainy {tag} is available (you have {current}).\n\nOpen the download page?");
-    let open = tauri::async_runtime::spawn_blocking(move || {
-        dialog
-            .dialog()
-            .message(message)
-            .title("Update available")
-            .buttons(MessageDialogButtons::OkCancelCustom("Open download page".into(), "Later".into()))
-            .blocking_show()
-    })
-    .await
-    .map_err(|e| e.to_string())?;
-    if open {
-        tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-/// "Check for updates" from the UI.
+/// "Check for updates" from the UI: offers to download and install a newer release (see `update.rs`).
 #[tauri::command]
 async fn check_for_updates(app: AppHandle) -> Result<(), String> {
-    check_for_updates_inner(app, false).await
+    update::check(app, false).await
 }
 
 /// `--smoke-test <report file>`: encode and decode a small image with every native codec and run a
@@ -471,7 +407,7 @@ pub fn run() {
             {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    let _ = check_for_updates_inner(handle, true).await;
+                    let _ = update::check(handle, true).await;
                 });
             }
             Ok(())
@@ -500,17 +436,6 @@ mod tests {
         assert_eq!(percent_decode("%E2%9C%93.jpg"), "\u{2713}.jpg");
         assert_eq!(percent_decode("100%.png"), "100%.png");
         assert_eq!(percent_decode("%zz"), "%zz");
-    }
-
-    #[test]
-    fn version_comparison_follows_semver_order() {
-        assert!(is_newer("v0.2.0", "0.1.9"));
-        assert!(is_newer("v1.0.0", "0.99.99"));
-        assert!(is_newer("v0.1.10", "0.1.9"));
-        assert!(!is_newer("v0.1.0", "0.1.0"));
-        assert!(!is_newer("v0.1.0", "0.2.0"));
-        assert!(!is_newer("nightly", "0.1.0"));
-        assert_eq!(parse_version("v1.2.3-rc.1"), Some((1, 2, 3)));
     }
 
     #[test]

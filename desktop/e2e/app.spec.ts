@@ -125,6 +125,30 @@ test('no result card shows a placeholder value such as "null" or "undefined"', a
   expect(text).not.toMatch(/(null|undefined|NaN)/);
 });
 
+test('the About tab shows the release number and the update button, and the footer shows the number on every tab', async () => {
+  const version = /\d+\.\d+\.\d+/;
+  await expect(page.locator('footer [data-app-version]')).toHaveText(new RegExp(`^KVGrainy ${version.source}$`));
+  const tabs = page.locator('#mode-reduce, #mode-tune, #mode-about');
+  await expect(tabs).toHaveCount(3);
+  const before = await page.locator('#mode-reduce').boundingBox();
+  await page.locator('#mode-about').click();
+  await expect(page.locator('#panel-mode-about')).toBeVisible();
+  await expect(page.locator('#panel-mode-about [data-app-version-number]')).toHaveText(version);
+  await expect(page.locator('#panel-mode-about').getByRole('button', { name: 'Check for updates' })).toBeVisible();
+  await expect(page.locator('footer [data-app-version]')).toHaveText(new RegExp(`^KVGrainy ${version.source}$`));
+  expect(await page.locator('#mode-reduce').boundingBox(), 'the tabs do not move').toEqual(before);
+  await page.locator('#mode-reduce').click();
+  await expect(page.locator('#panel-mode-about')).toBeHidden();
+});
+
+test('a VisualAssault theme applies in the desktop window', async () => {
+  const first = await page.locator('#theme-more optgroup option').first().getAttribute('value');
+  await page.locator('#theme-more').selectOption(first!);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'va');
+  await page.locator('[data-theme-choice="dark"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
 test('a second launch with a file hands it to the open window', async () => {
   const path = join(work, 'from-explorer.png');
   writeFileSync(path, flatPng(320, 240));

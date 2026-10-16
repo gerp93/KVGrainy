@@ -23,15 +23,16 @@ const $ = <T extends HTMLElement>(id: string): T => {
   return node as T;
 };
 
-// ---- Mode tabs (Reduce | Fine-Tune GIF) -------------------------------------------------
+// ---- Mode tabs (Reduce | Fine-Tune GIF | About, the last in the desktop app only) -------------
 
-type Mode = 'reduce' | 'tune';
-const modeTabs: Record<Mode, HTMLButtonElement> = { reduce: $('mode-reduce'), tune: $('mode-tune') };
-const modePanels: Record<Mode, HTMLElement> = { reduce: $('panel-mode-reduce'), tune: $('panel-mode-tune') };
+type Mode = 'reduce' | 'tune' | 'about';
+const MODES: Mode[] = document.getElementById('mode-about') ? ['reduce', 'tune', 'about'] : ['reduce', 'tune'];
+const modeTabs = Object.fromEntries(MODES.map((m) => [m, $<HTMLButtonElement>(`mode-${m}`)])) as Record<Mode, HTMLButtonElement>;
+const modePanels = Object.fromEntries(MODES.map((m) => [m, $(`panel-mode-${m}`)])) as Record<Mode, HTMLElement>;
 
 export function showMode(mode: Mode, focus = false) {
   document.documentElement.dataset.mode = mode;
-  for (const m of ['reduce', 'tune'] as const) {
+  for (const m of MODES) {
     const on = m === mode;
     modeTabs[m].setAttribute('aria-selected', String(on));
     modeTabs[m].tabIndex = on ? 0 : -1;
@@ -42,13 +43,18 @@ export function showMode(mode: Mode, focus = false) {
 
 export const isTuneMode = () => !modePanels.tune.hidden;
 
-for (const mode of ['reduce', 'tune'] as const) {
+/** Files arrive while the About tab is showing (a drop, a paste, "Open with"): go back to Reduce, where they will be listed. */
+export function leaveAbout() {
+  if (modePanels.about && !modePanels.about.hidden) showMode('reduce');
+}
+
+for (const [index, mode] of MODES.entries()) {
   modeTabs[mode].addEventListener('click', () => showMode(mode));
   modeTabs[mode].addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End') {
-      e.preventDefault();
-      showMode(e.key === 'ArrowRight' || e.key === 'End' ? 'tune' : 'reduce', true);
-    }
+    const target = { ArrowRight: (index + 1) % MODES.length, ArrowLeft: (index + MODES.length - 1) % MODES.length, Home: 0, End: MODES.length - 1 }[e.key];
+    if (target === undefined) return;
+    e.preventDefault();
+    showMode(MODES[target]!, true);
   });
 }
 

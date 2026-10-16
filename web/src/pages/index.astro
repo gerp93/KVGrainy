@@ -75,6 +75,7 @@ const csp = [
       <div class="tabs modes" role="tablist" aria-label="Mode">
         <button type="button" role="tab" id="mode-reduce" aria-controls="panel-mode-reduce" aria-selected="true">Reduce</button>
         <button type="button" role="tab" id="mode-tune" aria-controls="panel-mode-tune" aria-selected="false" tabindex="-1">Fine-Tune GIF</button>
+        {desktop && <button type="button" role="tab" id="mode-about" aria-controls="panel-mode-about" aria-selected="false" tabindex="-1">About</button>}
       </div>
 
       <div id="panel-mode-reduce" role="tabpanel" aria-labelledby="mode-reduce">
@@ -221,13 +222,38 @@ const csp = [
         </div>
 
       </div>
+
+      {
+        // The desktop app's About tab: what this build is, what it does with your files, and the update check.
+        desktop && (
+          <div id="panel-mode-about" role="tabpanel" aria-labelledby="mode-about" hidden>
+            <section class="about">
+              <h2>KVGrainy</h2>
+              <p class="about-version">
+                Version <strong data-app-version-number>…</strong>
+              </p>
+              <p>
+                Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels, so EXIF and GPS data are
+                always dropped.
+              </p>
+              <p id="about-update" class="about-update" />
+            </section>
+          </div>
+        )
+      }
     </main>
 
     <footer>
-      <p>
-        An early build. Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels,
-        so EXIF and GPS data are always dropped.
-      </p>
+      {
+        desktop ? (
+          <p data-app-version>KVGrainy</p>
+        ) : (
+          <p>
+            An early build. Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels, so EXIF and
+            GPS data are always dropped.
+          </p>
+        )
+      }
       {
         // The desktop app is the tool only; the guides live on the website and would navigate the window away from it.
         !desktop && (

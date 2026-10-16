@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { listen } from '@tauri-apps/api/event';
 import type { Shell } from './shell.web';
 
@@ -84,15 +85,32 @@ async function toFile(path: string): Promise<File> {
   return new File([bytes], name, { type: MIME[name.split('.').pop()?.toLowerCase() ?? ''] ?? '' });
 }
 
-// ---- Updates: a link in the footer ---------------------------------------------------------
+// ---- The release number: in the footer on every tab, and on the About tab -------------------
+
+void getVersion()
+  .then((version) => {
+    for (const label of document.querySelectorAll('[data-app-version]')) label.textContent = `KVGrainy ${version}`;
+    for (const label of document.querySelectorAll('[data-app-version-number]')) label.textContent = version;
+  })
+  .catch(() => {
+    /* keep the generic text */
+  });
+
+// ---- Updates: a button on the About tab ---------------------------------------------------------
 
 function addUpdateButton() {
-  const footer = document.querySelector('footer');
-  if (!footer) return;
+  const holder = document.getElementById('about-update');
+  if (!holder) return;
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'btn';
   button.textContent = 'Check for updates';
+  // The host downloads and installs an update itself; this shows how far the download is, whether the
+  // check was started by the button or by the start-up check.
+  void listen<{ fraction: number }>('update-progress', (event) => {
+    button.disabled = true;
+    button.textContent = `Downloading update ${Math.round(event.payload.fraction * 100)}%`;
+  });
   button.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -101,9 +119,10 @@ function addUpdateButton() {
       showToast(error instanceof Error ? error.message : String(error));
     } finally {
       button.disabled = false;
+      button.textContent = 'Check for updates';
     }
   });
-  footer.append(button);
+  holder.append(button);
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addUpdateButton);
 else addUpdateButton();

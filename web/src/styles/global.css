@@ -305,6 +305,21 @@ select {
   margin: 0 0 16px;
 }
 
+/* The desktop app's About tab. */
+.about {
+  max-width: 62ch;
+}
+.about h2 {
+  margin: 0 0 4px;
+}
+.about p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+.about .about-version {
+  color: var(--text);
+}
+
 .tune-box {
   margin-top: 12px;
   padding: 14px;
@@ -867,6 +882,7 @@ footer {
 }
 .toast span {
   overflow-wrap: anywhere;
+}
 
 /* Footer links, on the tool page and the content pages. Padded so each is a comfortable tap target (at least 24px). */
 .footer-links {
