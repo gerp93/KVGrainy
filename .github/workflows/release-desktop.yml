@@ -1,0 +1,171 @@
+name: Release desktop
+
+# Builds the Tauri desktop app on Windows, macOS (Apple silicon) and Linux, smoke-tests the packaged
+# binary, and attaches the installers to an existing GitHub release. Called by auto-release.yml and
+# cut-release.yml after the release exists. Code signing and notarization happen only when the
+# matching repository secrets are set; without them the installers are unsigned (SmartScreen and
+# Gatekeeper will warn) and say so. See docs/release.md for the secrets and how to get them.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Release tag, e.g. v1.2.3. The release must already exist.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, label: windows }
+          - { os: macos-latest, label: macos-arm64 }
+          - { os: ubuntu-22.04, label: linux }
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.label == 'macos-arm64' && 'aarch64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+          key: ${{ matrix.label }}
+      # rav1e (AVIF encode) and libaom (AVIF decode for scoring) need an assembler.
+      - if: matrix.label == 'windows'
+        uses: ilammy/setup-nasm@v1
+      - if: matrix.label == 'macos-arm64'
+        run: brew install nasm
+      - if: matrix.label == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+        working-directory: desktop
+
+      - name: Stamp the version into the app
+        shell: bash
+        run: |
+          node -e "const fs=require('fs');const f='desktop/src-tauri/tauri.conf.json';const j=JSON.parse(fs.readFileSync(f,'utf8'));j.version=process.env.VERSION.replace(/^v/,'');fs.writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+          grep '"version"' desktop/src-tauri/tauri.conf.json
+
+      - name: Import the Windows code-signing certificate
+        if: matrix.label == 'windows' && env.HAS_WINDOWS_CERT == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath "$env:RUNNER_TEMP\cert.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          $overlay = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } }
+          $overlay | ConvertTo-Json -Depth 5 | Set-Content -Path desktop\signing.conf.json -Encoding utf8
+          Remove-Item "$env:RUNNER_TEMP\cert.pfx"
+
+      - name: Say so when the build will be unsigned
+        shell: bash
+        run: |
+          if [ "${{ matrix.label }}" = "windows" ] && [ "$HAS_WINDOWS_CERT" != "true" ]; then echo "::warning::No WINDOWS_CERTIFICATE secret: the Windows installer is unsigned and SmartScreen will warn."; fi
+          if [ "${{ matrix.label }}" = "macos-arm64" ] && [ "$HAS_APPLE_CERT" != "true" ]; then echo "::warning::No APPLE_CERTIFICATE secret: the macOS app is unsigned and not notarized; Gatekeeper will block it until the user allows it."; fi
+
+      - name: Build, signed and notarized (macOS)
+        if: matrix.label == 'macos-arm64' && env.HAS_APPLE_CERT == 'true'
+        working-directory: desktop
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx tauri build --target aarch64-apple-darwin
+
+      - name: Build (unsigned macOS)
+        if: matrix.label == 'macos-arm64' && env.HAS_APPLE_CERT != 'true'
+        working-directory: desktop
+        run: npx tauri build --target aarch64-apple-darwin
+
+      - name: Build (Windows)
+        if: matrix.label == 'windows'
+        shell: bash
+        working-directory: desktop
+        run: |
+          if [ -f signing.conf.json ]; then npx tauri build --config signing.conf.json; else npx tauri build; fi
+
+      - name: Build (Linux)
+        if: matrix.label == 'linux'
+        working-directory: desktop
+        run: npx tauri build --bundles deb,rpm,appimage
+
+      # The packaged binary must be able to run every native codec and a whole search. A release
+      # that cannot is stopped here, before anything is uploaded.
+      - name: Smoke test the built binary
+        shell: bash
+        run: |
+          bin=$(find desktop/src-tauri/target -maxdepth 4 -type f -path '*/release/*' -name 'kvgrainy-desktop*' ! -name '*.d' ! -name '*.pdb' | head -1)
+          test -n "$bin"
+          echo "smoke testing $bin"
+          report="$RUNNER_TEMP/smoke.txt"
+          rm -f "$report"
+          "$bin" --smoke-test "$report" || true
+          for _ in $(seq 1 60); do [ -s "$report" ] && break; sleep 1; done
+          cat "$report"
+          grep -q '^PASSED$' "$report"
+
+      - name: Attach the installers to the release
+        shell: bash
+        run: |
+          files=$(find desktop/src-tauri/target -path '*/release/bundle/*' -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \))
+          test -n "$files"
+          echo "$files"
+          gh release upload "$VERSION" $files --clobber
+
+  # Package-manager manifests with the real hashes of what was just uploaded. Publishing them to
+  # winget, a Scoop bucket and a Homebrew tap needs the owner's accounts (docs/release.md).
+  packaging:
+    needs: bundle
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      HAS_WINGET_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+      - name: Render the manifests from the uploaded installers
+        run: |
+          mkdir -p assets manifests
+          gh release download "$VERSION" -p '*_x64-setup.exe' -p '*_aarch64.dmg' -D assets
+          python3 scripts/packaging.py --version "$VERSION" --assets-dir assets --out manifests
+          gh release upload "$VERSION" manifests/* --clobber
+      # Only after the package exists in microsoft/winget-pkgs (the first submission is manual).
+      - name: Submit the new version to winget
+        if: env.HAS_WINGET_TOKEN == 'true'
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: gerp93.KVGrainy
+          installers-regex: '_x64-setup\.exe$'
+          version: ${{ inputs.version }}
+          token: ${{ secrets.WINGET_TOKEN }}

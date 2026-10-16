@@ -54,7 +54,8 @@ standalone commit — see that doc.
 > and by the web tool, which compiles it to WebAssembly (`crates/kvgrainy-wasm`) and supplies
 > browser codecs; see [docs/web.md](docs/web.md) (content, SEO and the ad rules: [docs/web-content.md](docs/web-content.md)).
 > The desktop app (`desktop/`, Tauri) hosts the same UI and calls the core natively; see
-> [docs/desktop.md](docs/desktop.md). The core handles still images only. The
+> [docs/desktop.md](docs/desktop.md). Releases, signing secrets, the smoke test and package-manager manifests are in
+> [docs/release.md](docs/release.md). The core handles still images only. The
 > Python engine below remains the shipped desktop app and the reference for GIF and video.
 
 KVGrainy has two independent entry points sharing one optimization engine:
