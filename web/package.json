@@ -16,7 +16,9 @@
     "pretypecheck": "npm run wasm",
     "pretest": "npm run wasm",
     "test:e2e": "playwright test",
-    "budgets": "node scripts/check-budgets.mjs"
+    "budgets": "node scripts/check-budgets.mjs",
+    "check-ads": "node scripts/check-ads.mjs",
+    "test:ads": "node scripts/ads-smoke.mjs"
   },
   "dependencies": {
     "@jsquash/avif": "^2.1.1",

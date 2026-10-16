@@ -1,0 +1,63 @@
+---
+import Page from '../layouts/Page.astro';
+---
+
+<Page path="/compress-image-to-1mb/">
+  <h1>Compress an image to under 1 MB</h1>
+  <p class="lede">
+    One megabyte is generous. For most photos it is not a squeeze at all: the picture keeps its size and loses very little. The
+    interesting questions are which format to use and what to do about the occasional huge original.
+  </p>
+  <p><a class="btn primary" href="/?limit=1mb">Open the tool set to 1 MB</a></p>
+
+  <h2>What we measured</h2>
+  <p>
+    The same ten phone photos as in the <a href="/compress-image-to-100kb/">100 KB guide</a> (eight at 3 megapixels, two at 12),
+    with a 1 MB limit on Quick effort:
+  </p>
+  <ul>
+    <li>
+      <strong>Every photo kept its full size.</strong> None had to shrink.
+    </li>
+    <li>
+      <strong>The 3-megapixel photos came out at 0.46 to 0.83 MB</strong>, below the limit, because they had reached the top of the
+      quality scale (100) and there was nothing more to spend the budget on.
+    </li>
+    <li>
+      <strong>The 12-megapixel photos used the whole megabyte</strong> (0.93 and 1.0 MB) at JPEG quality 76 and 77, which is
+      still a very good-looking 12-megapixel picture.
+    </li>
+  </ul>
+  <p class="small">Ten photos from one phone, one run each, desktop engine. Results vary with how much fine detail a picture holds.</p>
+
+  <h2>Which format</h2>
+  <p>
+    JPEG won almost every time at this size, with WebP ahead on one photo. That is typical: at generous sizes the formats'
+    advantages shrink, and JPEG opens everywhere. If you plan to put the file somewhere that does not accept WebP or AVIF, force
+    JPEG in the Format box and you lose almost nothing at 1 MB. Under tighter limits the choice matters more; see
+    <a href="/jpeg-webp-avif-png/">the format guide</a>.
+  </p>
+
+  <h2>What to watch for</h2>
+  <ul>
+    <li>
+      <strong>Email.</strong> Attachments are usually encoded for email, which adds about a third to their size, and limits
+      apply to the whole message. A 1 MB photo is fine; five of them may not be. See
+      <a href="/common-size-limits/">common limits</a> for Gmail's rule and where it came from.
+    </li>
+    <li>
+      <strong>Screenshots.</strong> They are usually already well under 1 MB as PNG. KVGrainy will keep them lossless when it can.
+    </li>
+    <li>
+      <strong>Huge scans or panoramas.</strong> A 50-megapixel image does not fit under 1 MB at full size however clever the
+      search is; it will shrink. The page refuses inputs above 50 megapixels in the browser (the desktop app has no such limit).
+    </li>
+  </ul>
+
+  <h2>Why not just lower the quality slider?</h2>
+  <p>
+    Because quality and size interact differently for every picture. A single slider cannot tell that this photo is better off
+    smaller, or that this one should be WebP. KVGrainy searches both, so you choose the outcome (a size) and it finds the settings.
+    That is the whole idea; <a href="/how-it-works/">how it works</a> has the details.
+  </p>
+</Page>

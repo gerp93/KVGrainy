@@ -1,0 +1,96 @@
+---
+import Page from '../layouts/Page.astro';
+import { SITE } from '../site';
+---
+
+<Page path="/how-it-works/">
+  <h1>How KVGrainy fits an image under a size limit</h1>
+  <p class="lede">
+    You pick a size. KVGrainy looks for the version of your image that looks most like the original while staying under it.
+    There is no single setting that does that, so it searches.
+  </p>
+
+  <h2>What gets tried</h2>
+  <p>
+    An image gets smaller in two ways: by keeping fewer pixels (a smaller picture) or by describing the pixels less exactly (lower
+    quality). Which mix looks best depends on the picture. A photo of a face tolerates a lot of quality loss; a screenshot of
+    text does not, but it shrinks well when it has few colours. So for each format KVGrainy:
+  </p>
+  <ol>
+    <li>Starts at the original size and finds the highest quality that fits under your limit.</li>
+    <li>
+      If that quality is poor, steps the picture down (95%, 90%, 85%, and so on to 30% of the original width and height) and
+      repeats, because a smaller picture at higher quality often looks better than a full-size one at low quality.
+    </li>
+    <li>Stops once making the picture smaller no longer helps.</li>
+  </ol>
+  <p>
+    It does this for <strong>JPEG, WebP, AVIF and PNG</strong> (JPEG is skipped when your image has transparency, because JPEG
+    cannot hold any). PNG has two forms: lossless, which never changes a pixel, and a reduced-colour form that suits flat graphics
+    and screenshots; the browser version of this page only has the lossless one.
+  </p>
+
+  <h2>How it decides which looks best</h2>
+  <p>
+    Every candidate is compared to your original with <strong>SSIMULACRA2</strong>, a published perceptual metric designed to
+    agree with what people notice: blocky edges, banding, smeared detail and colour shifts. It is far better at this than a plain
+    pixel difference, which treats a harmless shift in brightness as badly as a missing eyebrow.
+  </p>
+  <p>
+    The comparison is done on a copy of the original no larger than one megapixel. That keeps it fast and light on memory (a
+    12-megapixel photo would otherwise need about two gigabytes to score in a browser), and in our tests it picked the same
+    winner as scoring the full image in 99% of cases. The highest score wins; scores that are practically equal go to the larger
+    picture, then the larger file, and a result that is visually identical to the original goes to the smaller file.
+  </p>
+
+  <div class="callout">
+    <p>
+      <strong>Quick and Best.</strong> AVIF often gives the smallest file, but it is by far the slowest format to encode. Quick
+      skips it and usually finishes several times faster, at the cost of a slightly lower score on some photos. Best tries it. If
+      you force a format yourself, that format is always used.
+    </p>
+  </div>
+
+  <h2>What happens to your image</h2>
+  <ul>
+    <li>
+      It is decoded by your browser, with its orientation (rotate-on-open) applied and its colours converted to the standard sRGB
+      space, so the result looks the same on every screen.
+    </li>
+    <li>
+      Everything after that happens in this tab, in background workers: nothing is sent anywhere. See
+      <a href="/privacy/">Privacy</a>.
+    </li>
+    <li>
+      The output is a fresh encode from pixels, so camera metadata (EXIF, GPS location, the thumbnail) is not carried over.
+    </li>
+  </ul>
+
+  <h2>GIFs and short clips</h2>
+  <p>
+    Animations have three knobs instead of two: the picture size, the number of colours (a GIF has at most 256 per frame) and the
+    number of frames. KVGrainy tunes all three, and the <a href="/make-gif-smaller/">Fine-Tune GIF</a> tab lets you decide which
+    to give up first. A GIF or clip comes out as a GIF, or as an animated WebP if you choose WebP, which is usually much smaller.
+  </p>
+
+  <h2>When it cannot fit</h2>
+  <p>
+    If even the smallest version is over your limit, KVGrainy says so and offers the smallest file it could make, clearly marked
+    as over the limit, so you are never left with nothing.
+  </p>
+
+  <h2>The same code runs in the desktop app</h2>
+  <p>
+    The search is written once, in Rust, and runs in this page as WebAssembly. The desktop app runs the same code natively, with
+    faster encoders and every CPU core, so it finishes sooner and can also make the reduced-colour PNGs. It is free and open
+    source (AGPL-3.0): <a href={SITE.repo}>read the code</a>.
+  </p>
+
+  <h2>What it will not do</h2>
+  <p>
+    It is not an editor: it will not crop, recolour or retouch. It does not guess what is important in a picture. And it cannot
+    make a detailed 12-megapixel photo fit under 50 KB without making it much smaller; the guides for
+    <a href="/compress-image-to-100kb/">100 KB</a>, <a href="/compress-image-to-1mb/">1 MB</a> and
+    <a href="/compress-image-to-2mb/">2 MB</a> show what that looks like on real photos.
+  </p>
+</Page>

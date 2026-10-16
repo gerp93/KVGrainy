@@ -1,0 +1,59 @@
+---
+import Page from '../layouts/Page.astro';
+---
+
+<Page path="/privacy/" ads={false}>
+  <h1>Privacy</h1>
+  <p class="lede">
+    Short version: your images never leave your device. Here is the long version, including what the website itself can see.
+  </p>
+
+  <h2>Your images</h2>
+  <p>
+    KVGrainy is a set of static files. When you add an image, your browser reads it and a background worker in this tab does all
+    the work. The page has no server that accepts uploads, so there is nowhere for an image to go. The page's security policy
+    (the Content-Security-Policy) allows connections to its own origin only, and an automated test, run on every change,
+    checks that no request carries image data and none goes to another host.
+  </p>
+
+  <h2>What is stored on your device</h2>
+  <ul>
+    <li>
+      <strong>Your theme choice</strong> (Dark, Light, Neon or a Visual Assault theme), in your browser's local storage, so the page
+      looks the same next time. Nothing else.
+    </li>
+    <li>
+      Results you create stay in this tab's memory only. Closing or refreshing the page clears them, so download what you want to
+      keep.
+    </li>
+  </ul>
+
+  <h2>Cookies, accounts and analytics</h2>
+  <p>
+    None. No cookies are set, there are no accounts, and there is no analytics or tracking script today. No third-party scripts,
+    fonts or images are loaded.
+  </p>
+
+  <h2>What the host can see</h2>
+  <p>
+    Like any website, the host that serves these files can see that a browser requested a page, with its IP address and browser
+    details, in ordinary server logs. It never sees your images, because they are never sent.
+  </p>
+
+  <h2>If that changes</h2>
+  <p>
+    If ads or analytics are ever added, this page will be updated first to say what they collect and which cookies they set, and
+    visitors in places that require it will be asked for consent before anything is loaded. Ads, if any, would never appear on the
+    tool page or near its buttons.
+  </p>
+
+  <h2>The desktop app</h2>
+  <p>
+    The desktop app works on files on your computer and never sends them anywhere. Its only network request is a check for a newer
+    version, made when it starts and when you press "Check for updates": it asks GitHub for the latest release, and sends nothing
+    about you or your files beyond what any web request includes (such as your IP address).
+  </p>
+
+  <h2>Questions</h2>
+  <p>See <a href="/contact/">Contact</a>.</p>
+</Page>

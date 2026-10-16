@@ -1,0 +1,11 @@
+---
+// The theme controls themes.ts wires up: three built-in themes plus the Visual Assault dropdown.
+---
+
+<div class="themes" role="group" aria-label="Theme">
+  <button type="button" data-theme-choice="dark" aria-pressed="true">Dark</button>
+  <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+  <button type="button" data-theme-choice="neon" aria-pressed="false">Neon</button>
+  <!-- The fourth choice is a dropdown of the Visual Assault themes; the script fills it in. -->
+  <span class="more-themes"><select id="theme-more" aria-label="More themes (Visual Assault)"></select></span>
+</div>

@@ -1,0 +1,74 @@
+---
+import Page from '../layouts/Page.astro';
+---
+
+<Page path="/compress-image-to-100kb/">
+  <h1>Compress an image to under 100 KB</h1>
+  <p class="lede">
+    100 KB is small. It is a common ask for forms, profile pictures and quick uploads. Here is what actually happens to a photo
+    when you squeeze it that far, measured rather than guessed.
+  </p>
+  <p><a class="btn primary" href="/?limit=100kb">Open the tool set to 100 KB</a></p>
+
+  <h2>What we measured</h2>
+  <p>
+    We ran ten real phone photos through KVGrainy with a 100 KB limit on Quick effort (it skips AVIF; Best does a little better).
+    Eight were about 3 megapixels (2048 × 1536); two were 12 megapixels (4032 × 3024).
+  </p>
+  <table>
+    <thead>
+      <tr><th>Photo</th><th>What fit under 100 KB</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>3 megapixels, smooth subject</td>
+        <td>Full size, as WebP at quality 79 to 85 (two of the eight).</td>
+      </tr>
+      <tr>
+        <td>3 megapixels, more detail</td>
+        <td>60% to 95% of the original width and height, as JPEG at quality 75 to 85 (six of the eight).</td>
+      </tr>
+      <tr>
+        <td>12 megapixels</td>
+        <td>Shrunk to about 30% to 35% of each side, as JPEG at quality 72 to 81 (about 1.1 to 1.5 megapixels).</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="small">
+    Ten photos from one phone, one run each, on the desktop engine; the browser version uses the same search with different
+    codecs, so its file sizes differ a little. Your images will differ: it depends on how much detail they hold.
+  </p>
+
+  <h2>What this means for you</h2>
+  <ul>
+    <li>
+      <strong>The pixel count is what decides it.</strong> A 100 KB budget buys roughly one to two megapixels of photograph. A 3-megapixel
+      photo usually keeps most of its size; a 12-megapixel one has to shrink a lot. If you control the original, shooting or
+      exporting smaller is the biggest single win.
+    </li>
+    <li>
+      <strong>Smaller and cleaner beats bigger and blocky.</strong> KVGrainy deliberately gives up pixels before it lets quality
+      fall too far, because a slightly smaller clean picture usually looks better than a full-size one full of blocks.
+    </li>
+    <li>
+      <strong>Flat graphics are different.</strong> A screenshot or logo with a few colours can fit under 100 KB at full size,
+      often as a reduced-colour PNG (desktop app) or WebP, with no visible loss.
+    </li>
+    <li>
+      <strong>Check the form's exact limit.</strong> "100 KB" can mean 100,000 or 102,400 bytes. KVGrainy's box uses 1 KB = 1,024
+      bytes, so type a slightly smaller number if a site is strict. Common upload limits with sources are on
+      <a href="/common-size-limits/">their own page</a>.
+    </li>
+  </ul>
+
+  <h2>If it still looks too rough</h2>
+  <ol>
+    <li>Crop the picture to the part that matters before you shrink it. Fewer pixels means more budget for each one.</li>
+    <li>Try Best effort, which also tries AVIF.</li>
+    <li>Ask for a little more: going from 100 KB to 150 KB often changes a rough result into a clean one.</li>
+  </ol>
+  <p>
+    Not sure which format you will get? See <a href="/jpeg-webp-avif-png/">JPEG, WebP, AVIF or PNG</a>, and
+    <a href="/how-it-works/">how the search works</a>.
+  </p>
+</Page>

@@ -1,0 +1,31 @@
+---
+import Page from '../layouts/Page.astro';
+import { SITE } from '../site';
+---
+
+<Page path="/contact/" ads={false}>
+  <h1>Contact and bug reports</h1>
+  <p class="lede">The best way to reach us is GitHub, where bugs and ideas are tracked in the open.</p>
+
+  <h2>A bug, or a picture it handles badly</h2>
+  <p>
+    <a href={SITE.issues}>Open an issue</a>. It helps a lot to include: your browser and system, the size limit you chose, the
+    format you picked (or Auto), and what you expected. Please do not attach a private photo; a description, or a similar public
+    image, is enough.
+  </p>
+
+  <h2>A feature, or a missing size limit</h2>
+  <p>
+    <a href={SITE.issues}>Open an issue</a> as well. For a size limit, include the page that states it: we add limits only after
+    reading the service's own page ourselves (see <a href="/common-size-limits/">common size limits</a>).
+  </p>
+
+  <h2>A security problem</h2>
+  <p>
+    Please report it privately through
+    <a href={`${SITE.repo}/security/advisories/new`}>a GitHub security advisory</a> rather than a public issue.
+  </p>
+
+  <h2>Source code</h2>
+  <p>It is all at <a href={SITE.repo}>{SITE.repo}</a>, under the AGPL-3.0 licence.</p>
+</Page>
