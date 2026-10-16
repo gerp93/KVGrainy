@@ -107,3 +107,30 @@ node crates/kvgrainy-wasm-spike/mem.mjs benchmark/corpus/photo_like.jpg 100000
 
 Windows native builds of the full workspace also need NASM 2.16.x and Perl on `PATH`
 (Git for Windows ships `perl.exe` under `usr\bin`).
+
+## Browser measurements on real photos (added 2026-10-16)
+
+The numbers above came from Node with synthetic images. These are from **the real page in Chromium 156**, on
+the 24-logical-core development machine, through the shipped web app: the Rust core as WebAssembly, one worker per format,
+jSquash codecs. Time is from adding the file to the finished card, with a 300 KB limit. The photos are real phone photos; file
+names are not printed. Reproduce with `cd web && npm run build && node scripts/time-search.mjs <photo>... --limit 300`
+(the script ends its own server).
+
+| Photo | Effort | Time | Result |
+|---|---|---|---|
+| 3 MP (0.7 MB file) | Quick | 7.5 s | JPEG q89, full size, 287 KB |
+| 3 MP | Best | 9.6 s | AVIF q92, 95% size, 297 KB |
+| 12 MP (2.8 MB file) | Quick | 26.0 s | JPEG q80, 50% size, 297 KB |
+| 12 MP | Best | 26.0 s | JPEG q80, 50% size, 297 KB |
+| 12 MP, AVIF forced | Best | 17.3 s | AVIF q51, full size, 293 KB |
+
+- **Best costs little extra on a 3 MP photo** because the format workers run in parallel and AVIF finishes alongside the others.
+- **On the 12 MP photo, Best and Quick took the same time** because the JPEG worker (walking down to half size) is the critical
+  path; the AVIF worker finished earlier, in 17 s, and its answer simply scored lower than JPEG at half size. AVIF is not
+  failing on large images in the browser.
+- **A 12 MP photo takes about 26 s** here in the browser, against about 95 s in the old native engine and a few seconds in
+  Quick on the new native one (docs/metric-study.md). The browser parallelises across formats but each worker is single-threaded
+  WASM, so it will be slower on a machine with fewer cores.
+
+**Still not measured:** memory in the browser (only time was recorded), a screenshot, Safari, Firefox, and any phone. The
+50-megapixel input cap in the page remains a guess about what a phone can hold.
