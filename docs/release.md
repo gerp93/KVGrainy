@@ -63,11 +63,19 @@ the `zip` crate, and every `zip` release those versions accept (2.x to 8.x) has 
 crates.io. Only `zip` 9.0.3 is live and the plugin does not allow it, so Cargo cannot resolve the
 dependency at all. A first attempt at adding it failed exactly there.
 
-Instead the app, at start-up and from the **Check for updates** button in the footer, asks
-GitHub's API for the newest release, compares its tag with the running version, and offers to open
-the download page. Nothing is downloaded or installed automatically, so there is no signature to
-verify and no new trust to establish: the user installs from the release page, which is where the
-installer's own signature (above) does its job.
+Instead the app does it itself (`desktop/src-tauri/src/update.rs`). At start-up and from the **Check for
+updates** button on the About tab it asks GitHub's API for the newest release and compares its tag with the
+running version. If there is a newer one it asks, then downloads the installer for this system, checks its
+SHA-256 against the digest GitHub records for the asset, runs it silently and starts the new version:
+
+- **Windows:** the NSIS installer (`*_x64-setup.exe`), run with `/S` after the app exits (per-user install, no
+  elevation), then the app is started again.
+- **Linux AppImage:** `*_amd64.AppImage` replaces the running file and is started.
+- **macOS, and Linux installs from a `.deb` or `.rpm`:** not automatic; the dialog opens the release page.
+
+The checksum proves the download is intact and is the file attached to that release. It does not prove who
+published the release, which the installers' code signature will once there are certificates. Only the
+Windows path has been run from here; the AppImage path is untested, and macOS has none.
 
 To do the real thing later: when Tauri publishes an updater that builds, add the plugin, generate a
 key with `npx tauri signer generate`, put the public key in `tauri.conf.json` (`plugins.updater`)

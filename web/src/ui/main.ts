@@ -4,7 +4,7 @@ import { shell } from '@shell';
 import { isVideoFile, loadAnimatedImage, loadVideoFrames, type FrameSource } from '../engine/frames';
 import { formatBytes, parseSizeLimit } from '../engine/limit';
 import { mountSizeField } from './sizefield';
-import { addToTuner, isTuneMode, openInTuner } from './tuner';
+import { addToTuner, isTuneMode, leaveAbout, openInTuner } from './tuner';
 import type { Effort } from '../engine/search';
 import { FORMAT_INFO, type Format, type OutputFormat, type OptimizeResult } from '../engine/types';
 
@@ -411,18 +411,21 @@ window.addEventListener('drop', (e) => {
   if (e.target instanceof Node && drop.contains(e.target)) return;
   e.preventDefault();
   const files = [...(e.dataTransfer?.files ?? [])];
+  leaveAbout();
   if (isTuneMode()) addToTuner(files);
   else enqueue(files);
 });
 window.addEventListener('paste', (e) => {
   const files = [...(e.clipboardData?.files ?? [])];
   if (files.length === 0) return;
+  leaveAbout();
   if (isTuneMode()) addToTuner(files);
   else enqueue(files);
 });
 
 // Files the host app hands over (the desktop app: a right-click in Explorer, "Open with", a second launch).
 shell.onOpenFiles?.((files) => {
+  leaveAbout();
   if (isTuneMode()) addToTuner(files);
   else enqueue(files);
 });
