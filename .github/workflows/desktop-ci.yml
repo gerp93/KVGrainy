@@ -65,6 +65,9 @@ jobs:
           path: desktop/src-tauri/target/debug
       - run: npm ci
         working-directory: desktop
+      # The specs share fixtures with the web app's, which use its packages (gifenc).
+      - run: npm ci
+        working-directory: web
       # The Playwright browser is not needed: the tests attach to the app's own WebView2 over CDP.
       - name: Drive the real app
         run: npx playwright test
