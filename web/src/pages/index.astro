@@ -2,6 +2,24 @@
 import '../styles/global.css';
 // Vendored from VisualAssault at a pinned tag; see scripts/update-visual-assault.mjs.
 import '../styles/visual-assault.css';
+import ThemeSwitcher from '../components/ThemeSwitcher.astro';
+import { PAGES, SITE, pageInfo } from '../site';
+
+const page = pageInfo('/');
+const canonical = SITE.url + '/';
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: SITE.name,
+  url: canonical,
+  description: page.description,
+  applicationCategory: 'MultimediaApplication',
+  operatingSystem: 'Any (runs in the browser)',
+  isAccessibleForFree: true,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+  codeRepository: SITE.repo,
+};
 
 // Strict from day one: nothing but our own origin, no inline script or style, no third parties.
 // Applied to production builds only so the dev server's hot reload keeps working.
@@ -24,12 +42,19 @@ const csp = [
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>KVGrainy: make your images more grainy</title>
-    <meta
-      name="description"
-      content="Get the best-looking version of an image that fits under the size you choose. It all runs in your browser; your image is never uploaded."
-    />
-    <meta name="robots" content="noindex" />
+    <title>{page.title}</title>
+    <meta name="description" content={page.description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="robots" content={SITE.launched ? 'index,follow' : 'noindex'} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={page.title} />
+    <meta property="og:description" content={page.description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
     <script is:inline src="/theme-init.js"></script>
   </head>
@@ -40,13 +65,7 @@ const csp = [
         <a class="brand" href="/">KV<span>Grainy</span></a>
         <span class="tagline">Make your images more grainy.</span>
       </h1>
-      <div class="themes" role="group" aria-label="Theme">
-        <button type="button" data-theme-choice="dark" aria-pressed="true">Dark</button>
-        <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-        <button type="button" data-theme-choice="neon" aria-pressed="false">Neon</button>
-        <!-- The fourth choice is a dropdown of the Visual Assault themes; the script fills it in. -->
-        <span class="more-themes"><select id="theme-more" aria-label="More themes (Visual Assault)"></select></span>
-      </div>
+      <ThemeSwitcher />
     </header>
 
     <main>
@@ -206,6 +225,12 @@ const csp = [
         An early build. Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels,
         so EXIF and GPS data are always dropped.
       </p>
+      <nav aria-label="More">
+        <ul class="footer-links">
+          {PAGES.filter((p) => p.kind !== 'tool').map((p) => <li><a href={p.path}>{p.title}</a></li>)}
+          <li><a href={SITE.repo}>Source code (AGPL-3.0)</a></li>
+        </ul>
+      </nav>
     </footer>
 
     <script>

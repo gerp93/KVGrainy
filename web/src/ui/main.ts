@@ -1,6 +1,6 @@
 import { loadSource, optimizeAnimation, optimizeImage, type Source } from '../engine/engine';
 import { isVideoFile, loadAnimatedImage, loadVideoFrames, type FrameSource } from '../engine/frames';
-import { formatBytes } from '../engine/limit';
+import { formatBytes, parseSizeLimit } from '../engine/limit';
 import { mountSizeField } from './sizefield';
 import { addToTuner, isTuneMode, openInTuner } from './tuner';
 import type { Effort } from '../engine/search';
@@ -36,6 +36,13 @@ import './themes';
 
 // The same size control the Fine-Tune GIF tab uses, with its own value.
 const reduceSize = mountSizeField($('reduce-size'), 'reduce', { value: '500', unit: 'kb' });
+// The size guides link here as /?limit=100kb; anything that isn't a size is ignored.
+try {
+  const wanted = new URLSearchParams(location.search).get('limit');
+  if (wanted) reduceSize.setBytes(parseSizeLimit(wanted), { silent: true });
+} catch {
+  /* not a size: keep the default */
+}
 const formatSelect = $<HTMLSelectElement>('format');
 const effortSelect = $<HTMLSelectElement>('effort');
 

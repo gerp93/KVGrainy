@@ -1,0 +1,12 @@
+---
+import Page from '../layouts/Page.astro';
+
+// Not in the page registry (site.ts): it is never listed, never in the sitemap, and always noindex.
+const info = { path: '/404/', title: 'Page not found', description: 'That page does not exist.', kind: 'info' as const };
+---
+
+<Page path="/404/" info={info} ads={false} noindex={true}>
+  <h1>Page not found</h1>
+  <p class="lede">There is nothing at this address.</p>
+  <p>Try <a href="/">the tool</a>, <a href="/how-it-works/">how it works</a> or <a href="/faq/">the FAQ</a>.</p>
+</Page>

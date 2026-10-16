@@ -1,0 +1,39 @@
+---
+import Page from '../layouts/Page.astro';
+import { SITE } from '../site';
+---
+
+<Page path="/about/" ads={false}>
+  <h1>About KVGrainy</h1>
+  <p class="lede">
+    KVGrainy takes an image, a GIF or a short clip and gets it under the size you choose, with the best quality possible. That one
+    job is the whole product.
+  </p>
+
+  <h2>Why it exists</h2>
+  <p>
+    Plenty of tools shrink images, but most make you pick a quality number and hope. What people actually have is a limit: an
+    upload cap, an email size, a form that says "under 100 KB". KVGrainy starts from the limit and searches for the best-looking
+    result that fits, across several formats and sizes. See <a href="/how-it-works/">how it works</a>.
+  </p>
+
+  <h2>What it is committed to</h2>
+  <ul>
+    <li><strong>Local-first.</strong> Your images stay on your device. There is no upload, no account and no server to send them to. This is enforced by an automated test, not just stated; see <a href="/privacy/">Privacy</a>.</li>
+    <li><strong>Free and open source.</strong> The code is on <a href={SITE.repo}>GitHub</a> under the AGPL-3.0 licence.</li>
+    <li><strong>One job, done well.</strong> It is not an image editor and will not become one.</li>
+    <li><strong>Honest about its limits.</strong> It tells you when something does not fit, and the guides show real measurements rather than promises.</li>
+  </ul>
+
+  <h2>Who makes it</h2>
+  <p>
+    KVGrainy is made by <a href={SITE.author.url}>{SITE.author.name}</a>. It began as a small desktop tool, and the same search now
+    runs in this page and in a desktop app, written once in Rust.
+  </p>
+
+  <h2>Get involved</h2>
+  <p>
+    Found a bug, or a picture it handles badly? That is the most useful thing you can send: see
+    <a href="/contact/">Contact</a>.
+  </p>
+</Page>
