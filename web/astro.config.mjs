@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
+import { readFile, writeFile } from 'node:fs/promises';
+import { applyLaunchHeaders } from './scripts/launch-headers.mjs';
 
 const wasmCodecs = ['@jsquash/jpeg', '@jsquash/webp', '@jsquash/avif', '@jsquash/png', '@jsquash/oxipng', '@jsquash/resize'];
 
@@ -9,7 +11,22 @@ const wasmCodecs = ['@jsquash/jpeg', '@jsquash/webp', '@jsquash/avif', '@jsquash
 const desktop = process.env.KVG_TARGET === 'desktop';
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 
+// `public/_headers` is the production header policy (CSP and friends). Whether search engines may index
+// the site is the one header that depends on the launch flag, so it is added to the built file here
+// rather than hard-coded: a build without PUBLIC_LAUNCH=1 says noindex, a launch build does not.
+const launchHeaders = {
+  name: 'kvgrainy-launch-headers',
+  hooks: {
+    'astro:build:done': async ({ dir }) => {
+      if (desktop) return;
+      const file = new URL('_headers', dir);
+      await writeFile(file, applyLaunchHeaders(await readFile(file, 'utf8'), process.env.PUBLIC_LAUNCH === '1'));
+    },
+  },
+};
+
 export default defineConfig({
+  integrations: [launchHeaders],
   outDir: desktop ? 'dist-desktop' : 'dist',
   server: { port: desktop ? 4322 : 4321 },
   // Strict CSP (no inline styles/scripts), so never inline.

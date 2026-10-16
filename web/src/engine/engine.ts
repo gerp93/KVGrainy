@@ -4,7 +4,8 @@ import type { Format, FormatResult, OptimizeResult, Raster } from './types';
 import type { FromWorker, ToWorker } from './worker';
 
 /** Refuse inputs above this many pixels: the working copies would not fit in a phone's memory. */
-const MAX_PIXELS = 50_000_000;
+/** The browser holds several copies of the pixels (one per format worker); past this a phone runs out of memory. */
+const MAX_PIXELS = 24_000_000;
 
 export interface Source {
   raster: Raster;
@@ -30,7 +31,9 @@ export async function loadSource(file: Blob): Promise<Source> {
   try {
     const { width, height } = bitmap;
     if (width * height > MAX_PIXELS) {
-      throw new Error(`This image is ${(width * height / 1e6).toFixed(0)} megapixels; the limit here is ${MAX_PIXELS / 1e6}.`);
+      throw new Error(
+        `This image is ${(width * height / 1e6).toFixed(0)} megapixels. The browser version handles up to ${MAX_PIXELS / 1e6} (a typical 12 MP phone photo is fine); the desktop app has no such limit.`,
+      );
     }
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });

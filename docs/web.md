@@ -72,5 +72,8 @@ the formats a search uses are downloaded.
 
 - Only Chromium. Safari (JavaScriptCore, stricter memory limits) and phones are untested.
 - The memory ceiling on large photos: each worker holds the source pixels, so four formats on a
-  48 MP image is several hundred MB per worker. The page refuses inputs above 50 MP.
+  48 MP image is several hundred MB per worker. The page refuses inputs above 24 MP. Measured in desktop Chromium on a 4-core machine (whole-browser memory, Quick effort, 500 KB
+  limit): a 12 MP photo peaks near 2.4 GB (about 63 s), a 24 MP photo near 3.6 GB (about 54 s), and a 45 MP flat PNG passed 4.7 GB
+  and had not finished after 4 minutes, which is why the cap was lowered from 50 MP. **The cap is not a phone-safe limit:** even a
+  typical 12 MP photo is heavy. A phone has not been tried; see TODO.md.
 - Speed against Squoosh and TinyPNG on real images (PLAN.md Phase 3 acceptance).

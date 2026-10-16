@@ -26,6 +26,10 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet. The plan the
 
 ## Verification gaps
 
+- Browser memory: a 12 MP photo peaks near 2.4 GB and a 24 MP photo (the current cap) near 3.6 GB in desktop Chromium
+  (docs/web.md). Try a real iPhone and an Android phone; if they crash, search on a downscaled copy instead of holding
+  full-resolution pixels in every format worker, rather than only lowering the cap.
+
 - Safari, Firefox and phones for the web tool; only Chromium is tested. Large-photo memory limits.
 - macOS and Linux desktop builds, a real right-click in Explorer, and the native Save dialog. (The NSIS installer, its registry entries, the installed app and the uninstall were verified on Windows; see docs/desktop.md.)
 - Compare size and quality against Squoosh and TinyPNG on 20 real images (PLAN.md Phase 3 acceptance),

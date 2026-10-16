@@ -2,6 +2,7 @@ import { optimizeAnimation } from '../engine/engine';
 import { loadSource, optimizeImage, type Source } from '@stills';
 import { shell } from '@shell';
 import { isVideoFile, loadAnimatedImage, loadVideoFrames, type FrameSource } from '../engine/frames';
+import { explainLoadError, looksLikeMedia, skippedMessage } from '../engine/inputErrors';
 import { formatBytes, parseSizeLimit } from '../engine/limit';
 import { mountSizeField } from './sizefield';
 import { addToTuner, isTuneMode, leaveAbout, openInTuner } from './tuner';
@@ -10,8 +11,6 @@ import { FORMAT_INFO, type Format, type OutputFormat, type OptimizeResult } from
 
 /** What a dropped file turned out to be once decoded: a still, or frames to fit as a GIF. */
 type Loaded = { kind: 'still'; source: Source } | FrameSource;
-
-const MEDIA_FILE = /\.(jpe?g|png|webp|gif|bmp|avif|mp4|m4v|mov|webm|mkv|avi)$/i;
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -129,8 +128,14 @@ $<HTMLButtonElement>('clear-finished').addEventListener('click', () => {
   for (const card of [...lists.finished.children]) disposers.get(card as HTMLElement)?.();
 });
 
+const dropNotice = $<HTMLElement>('drop-notice');
+
 function enqueue(files: File[]) {
-  const images = files.filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/') || MEDIA_FILE.test(f.name));
+  const images = files.filter(looksLikeMedia);
+  // Never fail silently: say which files were skipped. A later successful drop clears the message.
+  const skipped = files.filter((f) => !looksLikeMedia(f));
+  dropNotice.textContent = skipped.length > 0 ? skippedMessage(skipped) : '';
+  dropNotice.hidden = skipped.length === 0;
   if (images.length === 0) return;
   const settings = readSettings();
   if (!settings) return;
@@ -239,8 +244,18 @@ function createCard(file: File, settings: Settings) {
     };
   }
 
-  /** Decode the file once: a video or animated image becomes frames, anything else a still. */
+  /** Decode the file once, turning a browser's "could not decode" into something a person can act on. */
   async function load(): Promise<Loaded> {
+    try {
+      return await decode();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      throw new Error(explainLoadError(err, file));
+    }
+  }
+
+  /** A video or animated image becomes frames, anything else a still. */
+  async function decode(): Promise<Loaded> {
     if (isVideo) return loadVideoFrames(file, setNote);
     // The desktop app fits animated GIF, WebP and PNG natively (as a GIF), so it skips decoding frames here.
     // Choosing WebP output still takes the TypeScript path, which can write an animated WebP.
