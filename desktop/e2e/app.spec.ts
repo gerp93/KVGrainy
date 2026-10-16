@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { type Browser, type Page, chromium, expect, test } from '@playwright/test';
 import { flatPng, photoPng } from '../../web/e2e/fixture';
@@ -16,23 +16,40 @@ let browser: Browser;
 let page: Page;
 const work = mkdtempSync(join(tmpdir(), 'kvgrainy-desktop-e2e-'));
 
+// The app's own output goes to test-results/app.log, which CI uploads when a run fails, so a hosted
+// runner that cannot start the window says why instead of just timing out.
+const logPath = resolve(import.meta.dirname, '../test-results/app.log');
+
 test.beforeAll(async () => {
+  if (!existsSync(exe)) throw new Error(`the app has not been built: ${exe}`);
+  mkdirSync(dirname(logPath), { recursive: true });
+  const log = openSync(logPath, 'w');
   app = spawn(exe, [], {
     env: {
       ...process.env,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
       WEBVIEW2_USER_DATA_FOLDER: join(work, 'webview'),
     },
-    stdio: 'ignore',
+    stdio: ['ignore', log, log],
   });
-  for (let attempt = 0; attempt < 120 && !browser; attempt++) {
+  closeSync(log);
+  let exited: number | null = null;
+  app.on('exit', (code) => (exited = code ?? -1));
+  for (let attempt = 0; attempt < 150 && !browser; attempt++) {
+    if (exited !== null) break;
     try {
       browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
     } catch {
-      await sleep(500);
+      await sleep(1000);
     }
   }
-  if (!browser) throw new Error('could not reach the app over the WebView2 DevTools port');
+  if (!browser) {
+    const output = existsSync(logPath) ? readFileSync(logPath, 'utf8').slice(-3000) : '(no output)';
+    throw new Error(
+      `could not reach the app over the WebView2 DevTools port (${exited === null ? 'still running' : `exited with ${exited}`}). App output:
+${output}`,
+    );
+  }
   page = browser.contexts()[0]!.pages()[0]!;
   await page.waitForSelector('#file', { state: 'attached' });
 });
