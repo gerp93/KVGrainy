@@ -108,7 +108,7 @@ Benefits desktop and web alike; the native engine is currently too slow.
 
 | # | Task | Done when |
 |---|------|-----------|
-| 2.1 | Search with the proxy metric; SSIMULACRA2 only to verify the final pick | A 12 MP photo finishes in a stated time budget on a mid-range laptop (set the number after Phase 1; don't promise one before) |
+| 2.1 | Score on a 1 MP copy; cheaper search (guided parallel probes, skipped hopeless scales, Quick mode). The luma-SSIM proxy is not used for ranking until validated on graphics; see `docs/metric-study.md` | A 12 MP photo finishes in a stated time budget on a mid-range laptop (set the number after Phase 1; don't promise one before) |
 | 2.2 | Palette PNG path (oxipng + quantization) | The flat-colour screenshot no longer loses to pngquant/avifenc |
 | 2.3 | Load: wide-gamut and CMYK colour checks on real images; unreadable-ICC fallback | Fidelity tests cover them |
 | 2.4 | Clear failure result when nothing fits: best-effort smallest file plus message | No silent no-output cases; best-effort file is written |

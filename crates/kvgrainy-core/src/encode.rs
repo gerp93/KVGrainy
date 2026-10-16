@@ -5,7 +5,10 @@ pub enum Format {
     Jpeg,
     Webp,
     Avif,
+    /// Lossless PNG (oxipng-recompressed; a palette is used only when it changes no pixel).
     Png,
+    /// Lossy palette PNG, like pngquant: `quality` sets how closely the palette must match.
+    PngPalette,
 }
 
 impl Format {
@@ -14,11 +17,11 @@ impl Format {
             Format::Jpeg => "jpg",
             Format::Webp => "webp",
             Format::Avif => "avif",
-            Format::Png => "png",
+            Format::Png | Format::PngPalette => "png",
         }
     }
 
-    /// Whether quality is a tunable knob (PNG is lossless here).
+    /// Whether quality is a tunable knob (lossless PNG has none).
     pub fn has_quality(self) -> bool {
         self != Format::Png
     }

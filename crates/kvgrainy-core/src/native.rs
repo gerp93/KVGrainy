@@ -1,10 +1,10 @@
-//! The native codec set: mozjpeg, libwebp, rav1e (AVIF) and the `image` crate's PNG
-//! encoder. This is the only module that depends on C codecs, so a target without
+//! The native codec set: mozjpeg, libwebp, rav1e (AVIF), and PNG via the `image` crate,
+//! `imagequant` (palette quantization) and `oxipng` (lossless recompression). This is the only module that depends on C codecs, so a target without
 //! them (a browser build) supplies its own [`Encoder`] instead.
 
 use std::io::Cursor;
 
-use image::{codecs::png, ExtendedColorType, ImageEncoder};
+use image::{codecs::png as image_png, ExtendedColorType, ImageEncoder};
 
 use crate::encode::{Encoder, Format};
 use crate::raster::Raster;
@@ -19,7 +19,8 @@ impl Encoder for NativeEncoder {
             Format::Jpeg => encode_jpeg(raster, quality),
             Format::Webp => Ok(encode_webp(raster, quality)),
             Format::Avif => encode_avif(raster, quality),
-            Format::Png => encode_png(raster),
+            Format::Png => encode_png(raster, None),
+            Format::PngPalette => encode_png(raster, Some(quality)),
         }
     }
 
@@ -56,15 +57,56 @@ fn encode_webp(raster: &Raster, quality: u8) -> Vec<u8> {
     memory.to_vec()
 }
 
-fn encode_png(raster: &Raster) -> Result<Vec<u8>, String> {
+/// PNG, recompressed by oxipng. `None` is lossless (oxipng can still turn an image with few
+/// colours into a palette PNG without changing a pixel); `Some(quality)` quantizes to a palette
+/// with imagequant, the way pngquant does, which is what lets flat graphics shrink.
+fn encode_png(raster: &Raster, quality: Option<u8>) -> Result<Vec<u8>, String> {
+    let base = match quality {
+        None => truecolor_png(raster)?,
+        Some(quality) => palette_png(raster, quality)?,
+    };
+    let mut options = oxipng::Options::from_preset(2);
+    options.strip = oxipng::StripChunks::Safe;
+    oxipng::optimize_from_memory(&base, &options).or(Ok(base))
+}
+
+fn truecolor_png(raster: &Raster) -> Result<Vec<u8>, String> {
     let mut out = Cursor::new(Vec::new());
-    let encoder = png::PngEncoder::new_with_quality(&mut out, png::CompressionType::Best, png::FilterType::Adaptive);
+    let encoder = image_png::PngEncoder::new_with_quality(&mut out, image_png::CompressionType::Fast, image_png::FilterType::Adaptive);
     let result = match &raster.alpha {
         Some(_) => encoder.write_image(&raster.rgba(), raster.width, raster.height, ExtendedColorType::Rgba8),
         None => encoder.write_image(&raster.rgb, raster.width, raster.height, ExtendedColorType::Rgb8),
     };
     result.map_err(|e| e.to_string())?;
     Ok(out.into_inner())
+}
+
+/// Indexed PNG from an imagequant palette. `quality` becomes imagequant's target quality:
+/// it uses as few colours (at most 256) as that target allows.
+fn palette_png(raster: &Raster, quality: u8) -> Result<Vec<u8>, String> {
+    let mut attributes = imagequant::Attributes::new();
+    attributes.set_quality(0, quality).map_err(|e| e.to_string())?;
+    attributes.set_speed(4).map_err(|e| e.to_string())?;
+    let pixels: Vec<imagequant::RGBA> = raster.rgba().chunks_exact(4).map(|p| imagequant::RGBA::new(p[0], p[1], p[2], p[3])).collect();
+    let mut image = attributes
+        .new_image(pixels, raster.width as usize, raster.height as usize, 0.0)
+        .map_err(|e| e.to_string())?;
+    let mut quantized = attributes.quantize(&mut image).map_err(|e| e.to_string())?;
+    quantized.set_dithering_level(1.0).map_err(|e| e.to_string())?;
+    let (palette, indices) = quantized.remapped(&mut image).map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    let mut encoder = png::Encoder::new(&mut out, raster.width, raster.height);
+    encoder.set_color(png::ColorType::Indexed);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder.set_palette(palette.iter().flat_map(|c| [c.r, c.g, c.b]).collect::<Vec<u8>>());
+    if palette.iter().any(|c| c.a != 255) {
+        encoder.set_trns(palette.iter().map(|c| c.a).collect::<Vec<u8>>());
+    }
+    let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+    writer.write_image_data(&indices).map_err(|e| e.to_string())?;
+    writer.finish().map_err(|e| e.to_string())?;
+    Ok(out)
 }
 
 /// AVIF via rav1e at speed 8, which trades a little size for search throughput.

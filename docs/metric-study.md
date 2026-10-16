@@ -71,9 +71,10 @@ Capping brings a 12 MP photo from about 2 GB to about 240 MB, which fits a phone
 
 1. **The shared-core route is sound on memory and accuracy for photos.** Score a copy capped at
    1 MP: the search picks the same candidate (within 2 points) 96 to 99% of the time.
-2. **Search with luma SSIM at 1 MP, verify the final pick with SSIMULACRA2 at 1 MP.** That is the
-   PLAN.md Phase 2.1 design. In the browser it cuts a score from about 600 ms to about 90 ms for the
-   search steps; natively, 12 ms against 279 ms.
+2. **Luma SSIM at 1 MP is a cheap ranker for JPEG photos** (PLAN.md Phase 2.1's original design;
+   in the browser about 90 ms against about 600 ms per score, natively 12 ms against 279 ms). The
+   engine does not use it, because it mis-ranks palette PNG; see
+   [Applied in the engine](#applied-in-the-engine-phase-21-and-22).
 3. **Do not search with SSIMULACRA2 below 1 MP.** At 0.25 MP it falls to 78% within 2 points with
    a worst case of 24.75 points of regret.
 4. **The web engine's blended proxy is worse than plain luma SSIM at 1 MP** on photos (87% against
@@ -111,25 +112,41 @@ node crates/kvgrainy-wasm-spike/capped.mjs path/to/photo.jpg 60
 The per-image CSVs (`*-records.csv`, `*-candidates.csv`) are written under `target/` and not
 committed.
 
-## Applied in the engine (Phase 2.1)
+## Applied in the engine (Phase 2.1 and 2.2)
 
-`kvgrainy-core` now scores on a copy capped at 1 MP (`score::SCORE_CAP_PIXELS`). The search ranks the
-candidates of one format with the luma-SSIM proxy and verifies each format's best with
-SSIMULACRA2 at the cap, so the expensive score runs once per format instead of once per candidate.
-Quality probes run three at a time when the `parallel` feature is on (a fixed set per round, so
-output does not depend on core count) and one at a time otherwise. A lossless candidate is skipped
-when it cannot fit at the current scale. `Effort::Quick` (CLI `--quick`) leaves AVIF out.
+`kvgrainy-core` scores on a copy of the original capped at 1 MP (`score::SCORE_CAP_PIXELS`) and
+ranks **every** candidate with SSIMULACRA2 at that cap. The luma-SSIM proxy is in the crate
+(`proxy`, `Reference::proxy_with`) but the search does not use it. A first version ranked the
+candidates of one format with the proxy and verified only each format's best with SSIMULACRA2. It
+was faster (5 min 40 s on the set below) but it went wrong on palette PNG: luma SSIM cannot see the
+colour banding a palette introduces, so the search picked a palette image SSIMULACRA2 scores 0.49
+over a lossless one it scores 0.77. The study had only photos and JPEG, so it could not show that;
+the synthetic graphics cases did. Use the proxy again only after it is validated on real graphics,
+WebP, AVIF and palette PNG.
 
-Measured on 10 of the photos (2 at 12 MP, 8 at 3 MP), limit 100 KB, same machine, whole run:
+What did make the search faster (all four formats, same quality):
+
+- Quality probes run three at a time when the `parallel` feature is on, centred on a prediction of
+  the quality that lands just under the limit (log-size interpolation from the floor encode, then
+  from the nearest fit and miss). Evenly spaced probes had wasted 9 to 12 seconds per round on
+  high-quality 12 MP AVIF encodes that were 4 to 10 times over the limit.
+- A scale is skipped, without encoding, when the smallest full-size encode scaled by its pixel
+  count (with 2x slack) still exceeds the limit. A PNG family 1.5x or more over the limit at full
+  size is dropped unless PNG was forced.
+- `Effort::Quick` (CLI `--quick`) leaves AVIF out.
+- Probe sets are fixed per build, so output does not depend on core count.
+
+Measured on 10 of the photos (2 at 12 MP, 8 at 3 MP), limit 100 KB, whole run, same machine:
 
 | engine | wall time | mean SSIMULACRA2 vs old engine |
 |---|---|---|
-| before (full-resolution scoring, bisection) | 9 min 02 s | n/a |
-| capped scoring + proxy ranking | 8 min 09 s | -0.05 points |
-| + parallel quality probes, lossless skip | 5 min 40 s | -0.05 points |
-| + `--quick` (no AVIF) | 36 s | about -4 points (AVIF wins by 4 to 5 on 3 MP photos) |
+| before this work (full-resolution scoring, bisection) | 9 min 02 s | n/a |
+| capped scoring, proxy ranking (rejected, see above) | 5 min 40 s | -0.05 points |
+| capped scoring, SSIMULACRA2 ranking, evenly spaced probes | 11 min 08 s | not scored |
+| capped scoring, SSIMULACRA2 ranking, guided probes (shipped) | 7 min 19 s | +0.25 points |
+| shipped, `--quick` (no AVIF) | about 40 s | about -4 points |
 
 Outputs were scored with SSIMULACRA2 at a 4 MP cap, which the study shows matches full resolution.
-Every photo's new score is within 0.8 points of the old engine's. The 12 MP photos still take the
-longest: AVIF encoding, not scoring, is now the cost, so a faster AVIF setting or a smaller probe
-for the search is the next lever.
+The two 12 MP photos gain about 1.8 points each, because capped scoring no longer lets a heavily
+downscaled-and-upscaled candidate look hopeless against a 12 MP reference. A single 12 MP photo
+still takes about 95 s in `Best`; AVIF encoding is the cost.
