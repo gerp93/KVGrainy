@@ -1,0 +1,105 @@
+---
+import '../styles/global.css';
+// Vendored from VisualAssault at a pinned tag; see scripts/update-visual-assault.mjs.
+import '../styles/visual-assault.css';
+import '../styles/content.css';
+import AdSlot from '../components/AdSlot.astro';
+import ThemeSwitcher from '../components/ThemeSwitcher.astro';
+import { NAV, PAGES, SITE, pageInfo, type PageInfo } from '../site';
+
+interface Props {
+  /** The page's path in PAGES (site.ts), which supplies its title, description and kind. */
+  path: string;
+  /** Structured data for the page, when it is accurate and says something the page does not already. */
+  jsonLd?: object;
+  /** Pages with no real content of their own (privacy, contact, about) never carry an ad. */
+  ads?: boolean;
+  /** For a page that is not in the registry (the 404): its details. */
+  info?: PageInfo;
+  /** Keep this page out of search engines even after launch. */
+  noindex?: boolean;
+}
+
+const { path, jsonLd, ads = true, info, noindex = false } = Astro.props;
+const page = info ?? pageInfo(path);
+const canonical = SITE.url + path;
+
+// Same policy as the tool page: nothing but our own origin, no inline script or style.
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self'",
+  "img-src 'self' blob: data:",
+  "media-src 'self' blob:",
+  "worker-src 'self' blob:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join('; ');
+
+const footerLinks = PAGES.filter((p) => p.kind !== 'tool');
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{page.title}</title>
+    <meta name="description" content={page.description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="robots" content={SITE.launched && !noindex ? 'index,follow' : 'noindex'} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={page.title} />
+    <meta property="og:description" content={page.description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+    <script is:inline src="/theme-init.js"></script>
+  </head>
+  <body class="content-page">
+    <header class="top">
+      <a class="brand" href="/">KV<span>Grainy</span></a>
+      <nav aria-label="Main">
+        {
+          NAV.map((href) => (
+            <a href={href} aria-current={href === path ? 'page' : undefined}>
+              {pageInfo(href).nav ?? pageInfo(href).title}
+            </a>
+          ))
+        }
+      </nav>
+      <ThemeSwitcher />
+    </header>
+
+    <main>
+      <article>
+        <slot />
+      </article>
+      {ads && page.kind !== 'tool' && <AdSlot position="end" />}
+      <p class="cta"><a class="btn primary" href="/">Open the tool</a></p>
+    </main>
+
+    <footer>
+      <nav aria-label="Footer">
+        <ul class="footer-links">
+          {footerLinks.map((p) => <li><a href={p.path}>{p.title}</a></li>)}
+          <li><a href={SITE.repo}>Source code (AGPL-3.0)</a></li>
+        </ul>
+      </nav>
+      <p>
+        Nothing leaves your device: there is no server for your images to go to. Output is re-encoded from pixels, so EXIF and
+        GPS data are always dropped.
+      </p>
+    </footer>
+
+    <script>
+      import '../ui/themes';
+    </script>
+  </body>
+</html>

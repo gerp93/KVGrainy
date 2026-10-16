@@ -7,3 +7,5 @@ src/wasm/
 
 # Desktop-target build of the UI (embedded into the Tauri app)
 dist-desktop/
+dist-ads/
+dist-launch/

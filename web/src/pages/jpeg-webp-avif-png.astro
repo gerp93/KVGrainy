@@ -1,0 +1,71 @@
+---
+import Page from '../layouts/Page.astro';
+---
+
+<Page path="/jpeg-webp-avif-png/">
+  <h1>JPEG, WebP, AVIF or PNG: which format for a small file</h1>
+  <p class="lede">
+    No format is best at everything. Which one gives the smallest file at the same look depends on the picture and on the size
+    you are aiming for, which is why KVGrainy tries all of them instead of guessing.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Format</th><th>Good at</th><th>Watch out for</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>JPEG</strong></td>
+        <td>Photographs. Opens in everything, ever. Hard to beat when the limit is generous.</td>
+        <td>No transparency. Visible blocks and ringing at low quality.</td>
+      </tr>
+      <tr>
+        <td><strong>WebP</strong></td>
+        <td>
+          Photographs and graphics, with or without transparency, and animation. Smaller than JPEG at the same look, especially
+          under tight limits.
+        </td>
+        <td>A few older programs and some upload forms still reject it.</td>
+      </tr>
+      <tr>
+        <td><strong>AVIF</strong></td>
+        <td>Usually the smallest file for a photograph at a given look, with transparency too.</td>
+        <td>
+          Slow to produce, so KVGrainy only tries it on Best effort. Current browsers open it; much older software and some
+          upload forms do not.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>PNG</strong></td>
+        <td>Screenshots, logos and flat-colour graphics, where it is lossless and small. Keeps transparency exactly.</td>
+        <td>Large for photographs, because it never throws detail away.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>What we saw</h2>
+  <p>
+    On ten real phone photos with a 100 KB limit, JPEG and WebP won on Quick effort (WebP for the smoother pictures, JPEG for the
+    detailed ones). On Best effort, where AVIF also competes, it won on the 3-megapixel photos by about 4 to 5 points of the
+    SSIMULACRA2 quality score, a difference you can see at that size. With a 2 MB limit, a lossless PNG won for all of the
+    3-megapixel photos, because there was room to keep every pixel. Details are in the
+    <a href="/compress-image-to-100kb/">100 KB</a>, <a href="/compress-image-to-1mb/">1 MB</a> and
+    <a href="/compress-image-to-2mb/">2 MB</a> guides.
+  </p>
+
+  <h2>Rules of thumb</h2>
+  <ul>
+    <li>A photo, tight limit, and it only has to open on modern devices: <strong>let KVGrainy choose</strong>; expect WebP or AVIF.</li>
+    <li>A photo that must open anywhere (an old CMS, an email client, a printer shop): <strong>force JPEG</strong>.</li>
+    <li>A screenshot, a logo, or anything with text and flat colour: <strong>PNG</strong> or WebP; avoid JPEG, which smears edges.</li>
+    <li>Needs a transparent background: <strong>PNG, WebP or AVIF</strong>; JPEG would fill it with white.</li>
+  </ul>
+
+  <h2>Why not just pick one?</h2>
+  <p>
+    Because the winner changes with the picture and with the limit: a flat screenshot beats a photo codec as PNG, a smooth photo
+    wins with WebP at 100 KB, and a generous limit may favour lossless. KVGrainy runs the search for each format and keeps the
+    best-looking result under your limit; see <a href="/how-it-works/">how it works</a>. You can always override it with the
+    Format box.
+  </p>
+</Page>

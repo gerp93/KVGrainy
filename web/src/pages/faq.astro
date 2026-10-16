@@ -1,0 +1,72 @@
+---
+import Page from '../layouts/Page.astro';
+import { SITE } from '../site';
+
+// One list drives both the visible page and the FAQPage structured data, so they can never disagree.
+const faqs: { q: string; a: string }[] = [
+  {
+    q: 'Is my image uploaded anywhere?',
+    a: 'No. The page is static files; there is no server that receives images. Your browser decodes the image and a background worker in this tab searches for the best version. You can check: open your browser\'s network panel while you use it and you will see no request carrying your image.',
+  },
+  {
+    q: 'Why does the result look a little smaller than my original?',
+    a: 'To fit a tight limit, KVGrainy sometimes shrinks the picture a little before it lowers the quality, because a slightly smaller clean picture usually looks better than a full-size blocky one. The result card tells you the size it used, for example "resized to 90%". If you must keep every pixel, raise the limit.',
+  },
+  {
+    q: 'What do Quick and Best mean?',
+    a: 'Quick tries JPEG, WebP and PNG. Best also tries AVIF, which often gives the smallest file but takes much longer to encode. Best can look a little better at a tight limit; Quick is several times faster.',
+  },
+  {
+    q: 'Why did I get WebP or AVIF when I wanted JPEG?',
+    a: 'Because in Auto mode it picks whichever format looks best under your limit. Choose JPEG (or any format) in the Format box to force it. A forced format is always honoured.',
+  },
+  {
+    q: 'Can I keep the EXIF data or the location?',
+    a: 'No, on purpose. The output is a fresh encode from pixels, so camera details, GPS location and thumbnails are never carried over. The picture is still turned the right way up, and its colours are converted to standard sRGB so it looks the same everywhere.',
+  },
+  {
+    q: 'Which browsers does it work in?',
+    a: 'We test in Chrome and Edge (Chromium). Current Firefox and Safari should work, but we have not tested them yet, and we have not tested phones: very large photos may run out of memory on one. If something fails, please tell us.',
+  },
+  {
+    q: 'How large an image can I use?',
+    a: 'The browser version refuses images above 50 megapixels, because it cannot hold the working copies in memory. The desktop app has no such limit.',
+  },
+  {
+    q: 'What happens if nothing fits?',
+    a: 'It says so, and offers the smallest file it could make, clearly marked as over your limit, so you are never left with nothing.',
+  },
+  {
+    q: 'Does it work offline?',
+    a: 'Not as a feature. After the page and the codec for a format have loaded, the work itself needs no connection, but the site does not install for offline use yet. The desktop app works offline.',
+  },
+  {
+    q: 'Is it free? Are there ads?',
+    a: 'It is free and open source (AGPL-3.0). There are no ads today. If that ever changes, the Privacy page will say so first.',
+  },
+];
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+};
+---
+
+<Page path="/faq/" jsonLd={jsonLd}>
+  <h1>Frequently asked questions</h1>
+  <p class="lede">
+    Short answers. For how the search works, see <a href="/how-it-works/">how it works</a>; for what is stored,
+    <a href="/privacy/">Privacy</a>. Something missing? <a href={SITE.issues}>Ask on GitHub</a>.
+  </p>
+  <dl>
+    {
+      faqs.map((f) => (
+        <>
+          <dt>{f.q}</dt>
+          <dd>{f.a}</dd>
+        </>
+      ))
+    }
+  </dl>
+</Page>

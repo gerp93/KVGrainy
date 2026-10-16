@@ -1,0 +1,24 @@
+---
+import { SITE } from '../site';
+
+/**
+ * Where an ad may go. Three modes (PUBLIC_ADS):
+ *   off          renders nothing. The default.
+ *   placeholder  a labelled box with reserved space, to check the layout. The build check
+ *                (scripts/check-ads.mjs) refuses to ship a deployed build that contains one.
+ *   live         reserved for the real ad code, which needs the owner's publisher account, an
+ *                ads.txt, and a certified consent tool for visitors in the EEA, UK and Switzerland.
+ *                Nothing is wired yet: it renders nothing rather than guess.
+ *
+ * Never used on the tool page, and never near a button or the drop zone. See docs/web-content.md.
+ */
+const { position = 'inline' } = Astro.props as { position?: 'inline' | 'end' };
+---
+
+{
+  SITE.ads === 'placeholder' && (
+    <aside class="ad-slot" data-ad-placeholder data-position={position} aria-label="Advertisement placeholder">
+      <span>Advertisement placeholder</span>
+    </aside>
+  )
+}

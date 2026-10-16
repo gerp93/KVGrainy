@@ -1,0 +1,64 @@
+---
+import Page from '../layouts/Page.astro';
+---
+
+<Page path="/make-gif-smaller/">
+  <h1>Make a GIF smaller without ruining it</h1>
+  <p class="lede">
+    A GIF is big for three separate reasons, and each has its own fix. Knowing which one is costing you decides what to give up
+    first.
+  </p>
+  <p><a class="btn primary" href="/">Open the tool</a> (drop a GIF, or a short video clip, and open the Fine-Tune GIF tab)</p>
+
+  <h2>The three things that make a GIF big</h2>
+  <dl>
+    <dt>1. Picture size</dt>
+    <dd>
+      Every frame is stored separately, so size grows with width × height. Halving each side cuts the pixel count to a quarter.
+      This is usually the most effective knob, and the one you will notice most.
+    </dd>
+    <dt>2. Colours</dt>
+    <dd>
+      A GIF frame has at most 256 colours. Fewer colours (say 64) make each frame smaller, and look fine for flat artwork, but
+      cause visible banding in photographic or gradient-heavy clips.
+    </dd>
+    <dt>3. Number of frames</dt>
+    <dd>
+      Dropping every second frame roughly halves the file. KVGrainy keeps the animation's speed unchanged by lengthening the
+      frames it keeps, so the motion gets choppier rather than faster or slower.
+    </dd>
+  </dl>
+
+  <h2>Which to give up first</h2>
+  <p>It depends on what the animation is:</p>
+  <ul>
+    <li><strong>A screen recording or UI demo:</strong> keep the colours and the size (text must stay readable); drop frames.</li>
+    <li><strong>A cartoon or flat artwork:</strong> colours are cheap to lose; keep the size and the frames.</li>
+    <li><strong>A clip of real footage:</strong> keep the colours (banding shows) and shrink the picture first, then drop frames.</li>
+  </ul>
+  <p>
+    The <strong>Fine-Tune GIF</strong> tab lets you choose that priority and then slide from "most compressed" to "the best that
+    fits your limit", watching the result as an animation. The automatic mode makes a reasonable choice for you; Fine-Tune is for
+    when it is not the one you want.
+  </p>
+
+  <h2>A better format, when you can use it</h2>
+  <p>
+    If the place you are posting to accepts it, an <strong>animated WebP</strong> is usually much smaller than a GIF of the same
+    clip and keeps full colour and smooth transparency. Choose WebP in the Format box and KVGrainy writes an animated WebP instead
+    of a GIF. A short MP4 or WebM video is smaller still, but it is not an image and many places will not treat it as one.
+  </p>
+
+  <h2>Short clips</h2>
+  <p>
+    You can drop a short video clip and get a GIF (or animated WebP) out. Long or high-resolution clips are heavy for a browser
+    to decode into frames, so keep them to a few seconds; the page lets you trim the start and end. The desktop app handles longer
+    ones more comfortably.
+  </p>
+
+  <h2>Transparency</h2>
+  <p>
+    GIF has only on-or-off transparency: a pixel is fully see-through or fully solid, with no soft edges. A GIF made from
+    something with soft transparency gets its see-through areas filled with white. Animated WebP does not have that limit.
+  </p>
+</Page>
