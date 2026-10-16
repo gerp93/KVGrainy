@@ -29,7 +29,7 @@ listed in `TODO.md`.
 | **2** Shared core | Done, one gap | 2.1 capped scoring, guided parallel search, Quick mode. 2.2 palette PNG. 2.3 colour tests. 2.4 best-effort file when nothing fits. 2.6 AGPL and `THIRD_PARTY.md`. 2.7 determinism test. 2.5: re-tuned and measured against the old engine and a hand-tuned baseline, **not** against the competing tools. Time budget not met for a 12 MP photo in Best (about 95 s on 24 threads); Quick is seconds. |
 | **3** Web MVP | Done, with gaps | Runs on the shared Rust core in WebAssembly (`docs/web.md`), CSP, privacy test, bundle budgets, web CI, 26 browser tests. Gaps: Chromium only; golden corpus covers photo, transparent, nothing-fits and cancel but not CMYK or rotated photos in the browser; no Squoosh or TinyPNG comparison. |
 | **4** Desktop | Mostly done | 4.1 Tauri shell on the shared UI, native core (`docs/desktop.md`). 4.2 native GIF with gifski (automatic mode; Fine-Tune GIF is still the TypeScript tuner; animated WebP output is TypeScript). 4.4 save, reveal, one-instance open-with, Explorer menu entries (installer never built or run); no clipboard copy. 4.5 theming decided. **4.3 video is not done:** it needs ffmpeg (not installed here), your choice of LGPL or GPL build, and about 80 MB of binary. |
-| **5** Distribution | Built and run once, unsigned | 5.1 release workflow for three OSes: completed a real run (release v1.0.29: Windows, macOS arm64 and Linux bundles, smoke-tested and uploaded; see `docs/release.md`); **signing needs your certificates**, and only the Windows installer was installed and run. 5.2 self-update downloads, checks and installs the release itself (Windows and Linux AppImage; macOS opens the release page), because Tauri's updater cannot be built (every `zip` release it accepts is yanked). 5.3 smoke test in every build. 5.4 release filter. 5.5 manifests generated; publishing is yours. **5.6 Python app**: no longer packaged in releases; the source stays until native video. |
+| **5** Distribution | Built and run once, unsigned | 5.1 release workflow for three OSes: completed a real run (release v1.0.29: Windows, macOS arm64 and Linux bundles, smoke-tested and uploaded; see `docs/release.md`); **signing needs your certificates**, and only the Windows installer was installed and run. 5.2 self-update downloads, checks and installs the release itself (Windows and Linux AppImage; macOS opens the release page), because Tauri's updater cannot be built (every `zip` release it accepts is yanked). 5.3 smoke test in every build. 5.4 release filter. 5.5 manifests generated; publishing is yours. **5.6 Python app**: deleted from the repo on 2026-10-16 (history keeps it); `.mkv` and `.avi` stay unsupported until native video (4.3). |
 | **6** Content, SEO, ads | Done up to your accounts | 11 real pages, closed to search engines until `PUBLIC_LAUNCH=1`, ad rules enforced in code, Lighthouse 100 across the board. **Owner:** domain, hosting, analytics, ad network, consent tool, `ads.txt`. |
 | **7** Launch | Drafted | `docs/launch.md`: checklist, drafts, proposed stop-or-change numbers. **Owner:** every post, and the real numbers. |
 
@@ -56,7 +56,7 @@ web/      Static site. Core compiled to WASM + browser WASM codecs, Web Worker p
 | Encoders | mozjpeg (or jpegli), libwebp, AVIF (`ravif`/rav1e), oxipng + libimagequant, gifski, ffmpeg | browser-ready WASM codecs (jSquash family, to be verified) |
 | Metric | SSIMULACRA2 | cheap proxy for the search; SSIMULACRA2 to verify the final pick |
 | CLI | Rust binary over the core crate | n/a |
-| Python code | Reference engine until Rust reaches parity, then retired | n/a |
+| Python code | Deleted 2026-10-16 (in git history) | n/a |
 
 **The key design rule:** search, scoring, colour management and resize live in
 `core/` as pure Rust behind an `Encoder` trait. Only the codec layer differs per
@@ -183,7 +183,7 @@ stays thin.
 | 5.3 | Bundled ffmpeg and encoders pass a smoke test in release artifacts | Smoke test in CI |
 | 5.4 | `paths:` filter on `auto-release.yml` (owner approval) so web/docs changes do not cut desktop releases | Verified on a web-only change |
 | 5.5 | Publish to winget, Scoop, Homebrew | `winget install` works |
-| 5.6 | Retire the Python app; update README, CLAUDE.md, TODO.md | Docs match behavior |
+| 5.6 | Retire the Python app; update README, CLAUDE.md, TODO.md | Done 2026-10-16: source deleted, docs updated |
 
 ## Phase 6 — Web content, SEO, ads
 

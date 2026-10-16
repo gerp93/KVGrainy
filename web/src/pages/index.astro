@@ -56,7 +56,12 @@ const csp = [
     <meta property="og:title" content={page.title} />
     <meta property="og:description" content={page.description} />
     <meta property="og:url" content={canonical} />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={SITE.url + SITE.ogImage.path} />
+    <meta property="og:image:width" content={String(SITE.ogImage.width)} />
+    <meta property="og:image:height" content={String(SITE.ogImage.height)} />
+    <meta property="og:image:alt" content={SITE.ogImage.alt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={SITE.url + SITE.ogImage.path} />
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
     <script is:inline src="/theme-init.js"></script>
@@ -107,6 +112,8 @@ const csp = [
           <span>or paste, or click to choose. GIFs and clips come out as GIFs, or as animated WebP if you pick WebP.</span>
         </label>
 
+        <p id="drop-notice" class="drop-notice" role="status" hidden></p>
+
         <section id="jobs" class="jobs" aria-label="Your files" hidden>
           <div class="tabs" role="tablist" aria-label="Files">
             <button type="button" role="tab" id="tab-queue" aria-controls="panel-queue" aria-selected="true">
@@ -122,7 +129,11 @@ const csp = [
           </div>
           <div role="tabpanel" id="panel-finished" aria-labelledby="tab-finished" hidden>
             <div class="panel-bar">
-              <p class="empty">Results stay only in this tab, in memory. Closing or refreshing the page clears them, so download what you want to keep.</p>
+              <p class="empty">
+                {desktop
+                  ? 'Results stay in memory only. Closing the app clears them, so save what you want to keep.'
+                  : 'Results stay only in this tab, in memory. Closing or refreshing the page clears them, so download what you want to keep.'}
+              </p>
               <button type="button" id="clear-finished" class="btn">Clear finished</button>
             </div>
             <p id="empty-finished" class="empty">Nothing finished yet.</p>

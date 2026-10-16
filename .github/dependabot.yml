@@ -1,0 +1,33 @@
+# Weekly dependency updates, grouped so a week is one pull request per ecosystem, not a dozen.
+# Nothing here merges itself: each PR runs the same CI as any other change.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      rust: { patterns: ["*"] }
+  - package-ecosystem: cargo
+    directory: /desktop/src-tauri
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      rust-desktop: { patterns: ["*"] }
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      web: { patterns: ["*"] }
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      desktop: { patterns: ["*"] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }

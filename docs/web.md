@@ -68,9 +68,39 @@ stay green: if a change makes it fail, the change is wrong, not the test.
 `npm run budgets` fails the build when one is exceeded. Codecs load on demand per format, so only
 the formats a search uses are downloaded.
 
+## Memory
+
+Measured in desktop Chromium on a 4-core machine: whole-browser resident memory (the idle page alone is about 715 MB of it), Quick
+effort, a 500 KB limit, the same output every time.
+
+| | 12 MP photo | 24 MP photo |
+|---|---|---|
+| Before any of this | 2417 MB, 63 s | 3649 MB, 54 s |
+| Strip probe (all devices) | 1969 MB, 51 s | 2415 MB, 42 s |
+| Strip probe + one worker at a time (phone, low memory) | 1276 MB, 105 s | 1443 MB, 83 s |
+
+Two separate changes, both leaving the chosen result untouched:
+
+- **Strip probe** (`strip_encoded_len` in `crates/kvgrainy-core/src/search.rs`). For a source over 3 MP, the search used to encode the
+  whole image at full size and floor quality just to learn that it could not fit, the most memory-hungry thing it did. It now adds up
+  the encoded sizes of about 2 MP horizontal strips instead, and encodes the whole image only when that total says full size might
+  fit. Measured with the real encoders at 6 to 24 MP: the strip total is within 1.1% of the whole for JPEG, WebP and lossless PNG,
+  and 8.5% above it for AVIF (the check allows for that). Palette PNG, which is native-only, keeps encoding whole: per-strip palettes
+  made its total 9.5% low and its quantizer twice as slow. Images up to 3 MP take exactly the old path. A/B against the previous
+  binary over 20 image and limit combinations at Quick effort (a real photo, an upscaled real photo, a 4K screenshot, RGBA, a 45 MP
+  image, 100 KB to 8 MB limits): every output file was byte-identical, with equal or slightly better times. One Best-effort run
+  (AVIF included; 12 MP, 500 KB) was byte-identical too, 407 s against 386 s (about 5% slower) on this 4-core machine.
+- **One worker at a time** (`web/src/engine/parallelism.ts`). Each format worker holds about 550 MB at 12 MP whatever the format
+  (scoring alone is about 240 MB), and they run in parallel, so the sum is the peak. For an image over 4 MP on a phone or a device
+  reporting 4 GB or less, the workers now run one after another (a desktop runs two at a time above 16 MP). Same result, about twice the time.
+
+**Not verified:** a real phone. The 1.3 to 1.4 GB figures are desktop Chromium posing as an iPhone, and the whole-browser number
+overstates one tab's memory, but nothing here shows what mobile Safari or an Android browser will allow a tab. Safari and Firefox are untested. See TODO.md.
+
 ## Not verified yet
 
 - Only Chromium. Safari (JavaScriptCore, stricter memory limits) and phones are untested.
 - The memory ceiling on large photos: each worker holds the source pixels, so four formats on a
-  48 MP image is several hundred MB per worker. The page refuses inputs above 50 MP.
+  48 MP image is several hundred MB per worker. The page refuses inputs above 24 MP; a 45 MP flat PNG passed 4.7 GB and had not finished after 4 minutes, which is why the cap was
+  lowered from 50 MP. See "Memory" below for what is measured and what is not.
 - Speed against Squoosh and TinyPNG on real images (PLAN.md Phase 3 acceptance).

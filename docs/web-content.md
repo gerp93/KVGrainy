@@ -33,8 +33,13 @@ PUBLIC_LAUNCH=1 PUBLIC_SITE_URL=https://your-domain npm run build
 That switches the robots meta to `index,follow`, makes `robots.txt` allow crawling and point at the sitemap, lists all 12
 pages in `sitemap.xml`, and uses your domain in canonical URLs. The 404 page is never indexed.
 
-**Before launching, confirm:** the domain (PLAN.md D4 is open); the name on `/about/` (it is `SITE.author` in
-`web/src/site.ts`, a real person's name on a public page); and that you are happy with the copy. The numbers in the size guides come
+It also decides the `X-Robots-Tag: noindex` response header. That header is **not** in `public/_headers`: the build adds it to
+`dist/_headers` only when `PUBLIC_LAUNCH` is not `1` (`web/scripts/launch-headers.mjs`, wired in `astro.config.mjs`, unit-tested
+in `web/tests/inputs.test.ts`). It used to be hard-coded, which would have kept a launch build out of search engines.
+
+**Before launching, confirm:** the domain (PLAN.md D4 is open); and that you are happy with the copy. `/about/` names the
+GitHub handle only (`SITE.author` in `web/src/site.ts`), by the owner's choice; the `LICENSE` and `THIRD_PARTY.md` carry
+whatever copyright line they carry. The numbers in the size guides come
 from my runs on your phone photos and describe the desktop engine; rerun them if you change the search.
 
 ## Structured data

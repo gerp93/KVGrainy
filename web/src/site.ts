@@ -10,8 +10,10 @@ export const SITE = {
   ads: (import.meta.env.PUBLIC_ADS ?? 'off') as 'off' | 'placeholder' | 'live',
   repo: 'https://github.com/gerp93/KVGrainy',
   issues: 'https://github.com/gerp93/KVGrainy/issues',
-  /** Named on the About page. Confirm before launch; it is a real person's name on a public page. */
-  author: { name: 'Kaleb Van Gerpen', url: 'https://github.com/gerp93' },
+  /** Named on the About page: the GitHub handle only, by the owner's choice (no legal name on a public page). */
+  author: { name: 'gerp93', url: 'https://github.com/gerp93' },
+  /** The link-preview card (1200x630, in public/). Absolute, because crawlers need a full URL. */
+  ogImage: { path: '/og-image.png', width: 1200, height: 630, alt: 'KVGrainy: pick a size limit, get the best-looking image that fits under it.' },
 } as const;
 
 export * from './pages-data';

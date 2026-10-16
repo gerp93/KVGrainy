@@ -20,6 +20,18 @@ impl Raster {
         self.resized(width, height)
     }
 
+    /// The `count` rows starting at row `start`, as their own raster (a horizontal strip of the image).
+    pub fn rows(&self, start: u32, count: u32) -> Raster {
+        let row_len = self.width as usize;
+        let (from, to) = (start as usize * row_len, (start + count) as usize * row_len);
+        Raster {
+            width: self.width,
+            height: count,
+            rgb: self.rgb[from * 3..to * 3].to_vec(),
+            alpha: self.alpha.as_ref().map(|a| a[from..to].to_vec()),
+        }
+    }
+
     pub fn resized(&self, width: u32, height: u32) -> Raster {
         if (width, height) == (self.width, self.height) {
             return self.clone();

@@ -492,6 +492,11 @@ button:disabled {
 .card .note.bad {
   color: var(--danger);
 }
+.drop-notice {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 0.95rem;
+}
 
 .row {
   display: flex;
