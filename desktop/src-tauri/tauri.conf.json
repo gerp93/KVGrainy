@@ -35,7 +35,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "category": "Graphics",
+    "category": "GraphicsAndDesign",
     "shortDescription": "Fit an image, GIF or clip under a size limit with the best quality possible",
     "license": "AGPL-3.0-only",
     "licenseFile": "../../LICENSE",
