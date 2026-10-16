@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the KVGrainy window may do: talk to its own commands, save a file the user picked, and reveal it in the folder.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default", "opener:default"]
+}

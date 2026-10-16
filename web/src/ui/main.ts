@@ -1,4 +1,6 @@
-import { loadSource, optimizeAnimation, optimizeImage, type Source } from '../engine/engine';
+import { optimizeAnimation } from '../engine/engine';
+import { loadSource, optimizeImage, type Source } from '@stills';
+import { shell } from '@shell';
 import { isVideoFile, loadAnimatedImage, loadVideoFrames, type FrameSource } from '../engine/frames';
 import { formatBytes } from '../engine/limit';
 import { mountSizeField } from './sizefield';
@@ -403,6 +405,12 @@ window.addEventListener('drop', (e) => {
 window.addEventListener('paste', (e) => {
   const files = [...(e.clipboardData?.files ?? [])];
   if (files.length === 0) return;
+  if (isTuneMode()) addToTuner(files);
+  else enqueue(files);
+});
+
+// Files the host app hands over (the desktop app: a right-click in Explorer, "Open with", a second launch).
+shell.onOpenFiles?.((files) => {
   if (isTuneMode()) addToTuner(files);
   else enqueue(files);
 });

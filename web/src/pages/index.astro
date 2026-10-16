@@ -5,6 +5,9 @@ import '../styles/visual-assault.css';
 
 // Strict from day one: nothing but our own origin, no inline script or style, no third parties.
 // Applied to production builds only so the dev server's hot reload keeps working.
+// The desktop build also lets the page talk to its own Tauri shell over Tauri's IPC origins, and
+// nothing else: still no network host.
+const desktop = process.env.KVG_TARGET === 'desktop';
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
@@ -12,7 +15,7 @@ const csp = [
   "img-src 'self' blob: data:",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self'",
+  desktop ? "connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost" : "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",

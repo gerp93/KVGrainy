@@ -846,3 +846,24 @@ footer {
   background: var(--surface);
   color: var(--text);
 }
+
+/* The desktop app's "Saved to ..." notice (shell.desktop.ts). */
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  z-index: 50;
+}
+.toast span {
+  overflow-wrap: anywhere;
+}

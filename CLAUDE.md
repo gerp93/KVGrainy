@@ -30,6 +30,9 @@ cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduce
 # Web tool (static site; the search is the Rust core compiled to WASM, see docs/web.md)
 cd web && npm ci && npm test && npm run build && npm run budgets && npm run test:e2e
 
+# Desktop app (Tauri around the same UI, native core; Windows e2e; see docs/desktop.md)
+cd desktop && npm ci && npx tauri build --debug --no-bundle && npx playwright test
+
 # Compile-check after edits (fast syntax/import sanity check, no test runner needed)
 python -m py_compile gui.py kvgrainy.py updater.py theming.py
 ```
@@ -49,7 +52,8 @@ standalone commit — see that doc.
 > A Rust rewrite of the engine is underway per [PLAN.md](PLAN.md). `crates/kvgrainy-core`
 > (search, scoring, colour, codecs behind an `Encoder` trait) is shared by `crates/kvgrainy-cli`
 > and by the web tool, which compiles it to WebAssembly (`crates/kvgrainy-wasm`) and supplies
-> browser codecs; see [docs/web.md](docs/web.md). The core handles still images only. The
+> browser codecs; see [docs/web.md](docs/web.md). The desktop app (`desktop/`, Tauri) hosts the same
+> UI and calls the core natively; see [docs/desktop.md](docs/desktop.md). The core handles still images only. The
 > Python engine below remains the shipped desktop app and the reference for GIF and video.
 
 KVGrainy has two independent entry points sharing one optimization engine:
