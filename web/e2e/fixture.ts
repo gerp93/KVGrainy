@@ -1,5 +1,8 @@
+import { createRequire } from 'node:module';
 import { deflateSync } from 'node:zlib';
-import { GIFEncoder, applyPalette, quantize } from 'gifenc';
+
+// gifenc is a CommonJS package: load it the way Node's ESM loader (which runs these specs) can.
+const { GIFEncoder, applyPalette, quantize } = createRequire(import.meta.url)('gifenc') as typeof import('gifenc');
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
   let c = n;

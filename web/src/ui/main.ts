@@ -313,7 +313,7 @@ function createCard(file: File, settings: Settings) {
       const newH = Math.max(1, Math.round(height * candidate.scale));
       const detail = [
         info.label,
-        candidate.format === 'gif' ? `${candidate.colors} colors` : candidate.quality !== undefined ? `quality ${candidate.quality}` : 'lossless',
+        candidate.colors !== undefined ? `${candidate.colors} colors` : candidate.quality !== undefined ? `quality ${candidate.quality}` : 'lossless',
         candidate.scale < 1 ? `resized to ${newW}×${newH} (${Math.round(candidate.scale * 100)}%)` : 'full size',
         candidate.frameStep && candidate.frameStep > 1 ? `every ${candidate.frameStep === 2 ? '2nd' : `${candidate.frameStep}th`} frame` : '',
         `${seconds}s`,
