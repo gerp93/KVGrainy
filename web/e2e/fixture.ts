@@ -42,3 +42,24 @@ export function photoPng(width: number, height: number, alpha = false): Buffer {
     chunk('IEND', new Uint8Array()),
   ]);
 }
+
+/** A flat-colour, screenshot-like RGB PNG: a few solid blocks. A palette PNG represents it exactly, far smaller than a photo codec could. */
+export function flatPng(width: number, height: number): Buffer {
+  const colours = [[250, 250, 250], [30, 60, 140], [220, 60, 60], [40, 160, 90], [240, 200, 50], [90, 90, 100]];
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    const row = y * (width * 3 + 1);
+    raw[row] = 0;
+    for (let x = 0; x < width; x++) {
+      const [r, g, b] = colours[(Math.floor(x / 40) + Math.floor(y / 30)) % colours.length]!;
+      raw.set([r!, g!, b!], row + 1 + x * 3);
+    }
+  }
+  const ihdr = Buffer.concat([u32(width), u32(height), Uint8Array.of(8, 2, 0, 0, 0)]);
+  return Buffer.concat([
+    Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', new Uint8Array()),
+  ]);
+}

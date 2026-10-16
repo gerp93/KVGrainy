@@ -1,8 +1,27 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": ["src", "tests", ".astro/types.d.ts"],
+  "include": [
+    "src",
+    "tests",
+    ".astro/types.d.ts"
+  ],
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "noUncheckedIndexedAccess": true
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@stills": [
+        "./src/engine/stills.web.ts"
+      ],
+      "@shell": [
+        "./src/engine/shell.web.ts"
+      ],
+      "@core-wasm": [
+        "./src/wasm/kvgrainy_wasm.js"
+      ]
+    }
   }
 }

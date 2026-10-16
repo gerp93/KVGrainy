@@ -14,7 +14,8 @@ const wasm = resolve(repo, 'target/wasm32-unknown-unknown/wasm/kvgrainy_wasm.was
 const run = (command, args, options = {}) => execFileSync(command, args, { stdio: 'inherit', cwd: repo, ...options });
 
 const lock = readFileSync(resolve(repo, 'Cargo.lock'), 'utf8');
-const wanted = /name = "wasm-bindgen"\nversion = "([^"]+)"/.exec(lock)?.[1];
+// [.] / \s keep this working when Git checked Cargo.lock out with CRLF line endings.
+const wanted = /name = "wasm-bindgen"\s+version = "([^"]+)"/.exec(lock)?.[1];
 let installed = '';
 try {
   installed = execFileSync('wasm-bindgen', ['--version'], { encoding: 'utf8' }).trim().split(' ')[1] ?? '';

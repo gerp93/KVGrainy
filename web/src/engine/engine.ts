@@ -9,6 +9,8 @@ const MAX_PIXELS = 50_000_000;
 export interface Source {
   raster: Raster;
   hasAlpha: boolean;
+  /** The original file, kept for hosts that decode it themselves (the desktop app sends it to the native core). */
+  file?: Blob;
 }
 
 export interface OptimizeOptions {

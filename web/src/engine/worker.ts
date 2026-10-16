@@ -3,7 +3,7 @@ import type { Effort } from './search';
 import { createSyncCodec } from './syncCodec';
 import type { Format, FormatResult } from './types';
 import { searchAnimatedWebp } from './webpanim';
-import init, { Source, bestEffort, initPanicHook, searchFormat } from '../wasm/kvgrainy_wasm.js';
+import init, { Source, bestEffort, initPanicHook, searchFormat } from '@core-wasm';
 
 /**
  * Runs one search off the main thread: either a single still format, or the GIF search for an

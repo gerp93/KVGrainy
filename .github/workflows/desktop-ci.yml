@@ -1,0 +1,77 @@
+name: Desktop CI
+
+# The Tauri desktop app: the shared web UI hosted in a native shell that runs kvgrainy-core natively.
+# Windows is the target the end-to-end tests drive (WebView2 over its DevTools port). Release builds
+# for all three OSes, signing and the updater are the release workflow's job.
+on:
+  pull_request:
+    paths: ["desktop/**", "web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/desktop-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["desktop/**", "web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/desktop-ci.yml"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      # rav1e (AVIF encode) and libaom (AVIF decode for scoring) need an assembler.
+      - uses: ilammy/setup-nasm@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+        working-directory: desktop
+      - name: Rust unit tests
+        run: cargo test
+        working-directory: desktop/src-tauri
+      # Builds the web UI for the desktop target, embeds it, and compiles the app (no installer).
+      - name: Build the debug app
+        run: npx tauri build --debug --no-bundle
+        working-directory: desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kvgrainy-desktop-debug-windows
+          path: desktop/src-tauri/target/debug/kvgrainy-desktop.exe
+          retention-days: 3
+
+  e2e:
+    needs: build
+    runs-on: windows-latest
+    # Informational until it has proven itself on a hosted runner. It passes on a developer machine; the
+    # first hosted run could not reach the window over WebView2's DevTools port, and the app's output is
+    # now captured (desktop-e2e-results/app.log) to show why. The `build` job above is the required one.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: kvgrainy-desktop-debug-windows
+          path: desktop/src-tauri/target/debug
+      - run: npm ci
+        working-directory: desktop
+      # The Playwright browser is not needed: the tests attach to the app's own WebView2 over CDP.
+      - name: Drive the real app
+        run: npx playwright test
+        working-directory: desktop
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-results
+          path: desktop/test-results
+          retention-days: 7

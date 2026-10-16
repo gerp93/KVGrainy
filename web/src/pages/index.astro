@@ -23,6 +23,9 @@ const jsonLd = {
 
 // Strict from day one: nothing but our own origin, no inline script or style, no third parties.
 // Applied to production builds only so the dev server's hot reload keeps working.
+// The desktop build also lets the page talk to its own Tauri shell over Tauri's IPC origins, and
+// nothing else: still no network host.
+const desktop = process.env.KVG_TARGET === 'desktop';
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
@@ -30,7 +33,7 @@ const csp = [
   "img-src 'self' blob: data:",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self'",
+  desktop ? "connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost" : "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
@@ -225,12 +228,17 @@ const csp = [
         An early build. Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels,
         so EXIF and GPS data are always dropped.
       </p>
-      <nav aria-label="More">
-        <ul class="footer-links">
-          {PAGES.filter((p) => p.kind !== 'tool').map((p) => <li><a href={p.path}>{p.title}</a></li>)}
-          <li><a href={SITE.repo}>Source code (AGPL-3.0)</a></li>
-        </ul>
-      </nav>
+      {
+        // The desktop app is the tool only; the guides live on the website and would navigate the window away from it.
+        !desktop && (
+          <nav aria-label="More">
+            <ul class="footer-links">
+              {PAGES.filter((p) => p.kind !== 'tool').map((p) => <li><a href={p.path}>{p.title}</a></li>)}
+              <li><a href={SITE.repo}>Source code (AGPL-3.0)</a></li>
+            </ul>
+          </nav>
+        )
+      }
     </footer>
 
     <script>
