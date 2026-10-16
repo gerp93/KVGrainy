@@ -1,0 +1,64 @@
+---
+import Page from '../layouts/Page.astro';
+---
+
+<Page path="/compress-image-to-2mb/">
+  <h1>Compress an image to under 2 MB</h1>
+  <p class="lede">
+    At 2 MB there is room to spare for a typical photo, so the question changes from "how do I make it fit" to "what is the best I
+    can do with the room". The answer is sometimes surprising: for some pictures it is a lossless file.
+  </p>
+  <p><a class="btn primary" href="/?limit=2mb">Open the tool set to 2 MB</a></p>
+
+  <h2>What we measured</h2>
+  <p>
+    The same ten phone photos as in the <a href="/compress-image-to-100kb/">100 KB</a> and <a href="/compress-image-to-1mb/">1 MB</a>
+    guides, with a 2 MB limit on Quick effort:
+  </p>
+  <ul>
+    <li>
+      <strong>The two 12-megapixel photos</strong> fit at 85% and 95% of their width and height, as JPEG at quality 92 to 94.
+      They are the ones that actually feel the limit.
+    </li>
+    <li>
+      <strong>All eight 3-megapixel photos came out as PNG</strong> (1.9 to 2.0 MB). Three were <em>lossless at full size</em>:
+      identical to the original, pixel for pixel. The other five were PNGs of a slightly smaller version (80% to 90% of each
+      side), because a full-size PNG would not have fit.
+    </li>
+  </ul>
+  <div class="callout">
+    <p>
+      <strong>Why would a "compressor" give you a lossless PNG?</strong> You asked for the best-looking result under 2 MB, and a
+      lossless file looks better than any lossy one. KVGrainy uses the room you give it. If you would rather have a smaller file,
+      lower the limit; if you need a JPEG for compatibility, force JPEG in the Format box.
+    </p>
+  </div>
+  <p class="small">
+    Ten photos from one phone, one run each, desktop engine, Quick effort. A lossless PNG only fits because these photos are
+    smooth; a sharper or noisier photo would not fit that way and would come out as JPEG or WebP.
+  </p>
+
+  <h2>Using the headroom</h2>
+  <ul>
+    <li>
+      <strong>You do not need to fill the limit.</strong> KVGrainy reports the size it chose. A result well under 2 MB means the
+      picture could not use more, not that it left quality on the table.
+    </li>
+    <li>
+      <strong>Prefer compatibility over the last few percent?</strong> At this size JPEG is almost always within a hair of the
+      best format and opens everywhere. Force it.
+    </li>
+    <li>
+      <strong>Uploading to a site with a 2 MB cap?</strong> Aim a little under: type 1.9 so a rounding difference cannot put you
+      over. Some sites publish their limit and some do not; the ones we have checked are on the
+      <a href="/common-size-limits/">common limits</a> page, with sources.
+    </li>
+  </ul>
+
+  <h2>If it will not fit</h2>
+  <p>
+    A very large original (tens of megapixels, or a scan with fine grain) can be too much for 2 MB without shrinking. KVGrainy
+    will shrink it as little as it can and tell you. If you must keep every pixel, you need a bigger limit, not a better tool.
+    <a href="/how-it-works/">How the search decides</a> explains the trade.
+  </p>
+</Page>

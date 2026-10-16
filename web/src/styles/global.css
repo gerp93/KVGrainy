@@ -866,4 +866,19 @@ footer {
 }
 .toast span {
   overflow-wrap: anywhere;
+
+/* Footer links, on the tool page and the content pages. Padded so each is a comfortable tap target (at least 24px). */
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+}
+
+.footer-links a {
+  display: inline-block;
+  padding: 7px 0;
+  color: var(--muted);
 }

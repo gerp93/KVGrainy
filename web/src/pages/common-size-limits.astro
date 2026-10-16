@@ -1,0 +1,64 @@
+---
+import Page from '../layouts/Page.astro';
+import { PRESETS, limitText } from '../engine/presets';
+
+/** The figure as the service writes it: whole MB for the big ones, KiB for exact binary sizes, else decimal KB. */
+function human(bytes: number): string {
+  if (bytes >= 1_000_000) return `${bytes / 1_000_000} MB`;
+  return bytes % 1024 === 0 ? `${bytes / 1024} KiB` : `${bytes / 1000} KB`;
+}
+---
+
+<Page path="/common-size-limits/">
+  <h1>Common upload size limits, with sources</h1>
+  <p class="lede">
+    Every limit here comes from the service's own page, and each shows the date someone read that page. Limits change, so check the
+    source before you rely on one. We never list a limit from memory.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Where</th><th>Limit</th><th>Applies to</th><th>Source (checked)</th></tr>
+    </thead>
+    <tbody>
+      {
+        PRESETS.map((preset) => (
+          <tr>
+            <td>{preset.label}</td>
+            <td>{human(preset.bytes)}</td>
+            <td>{preset.detail}</td>
+            <td>
+              <a href={preset.source.url}>{preset.source.title}</a> <span class="small">({preset.verifiedOn})</span>
+              <br />
+              <a href={`/?limit=${limitText(preset.bytes)}`}>Reduce to fit</a>
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <h2>Reading these numbers</h2>
+  <ul>
+    <li>
+      <strong>MB and MiB.</strong> Where a site writes "MB" without saying which, we take the smaller (decimal) reading, so a
+      file that fits here fits under either.
+    </li>
+    <li>
+      <strong>KVGrainy's own box uses binary units</strong> (1 KB = 1,024 bytes). The "Reduce to fit" links above set it to just
+      under the limit, never over.
+    </li>
+    <li>
+      <strong>A limit is a ceiling, not a target.</strong> A result a little under it is fine, and leaves room for rounding.
+    </li>
+    <li>
+      <strong>Some limits belong to your account,</strong> not the service: Gmail's differs for work and school accounts, and
+      Discord says it is testing other limits. When in doubt, trust the service's current page over this one.
+    </li>
+  </ul>
+
+  <p>
+    Missing one you use? <a href="/contact/">Tell us</a>, with the page that states the limit, and we will add it once we have
+    read that page ourselves.
+  </p>
+</Page>

@@ -18,7 +18,9 @@
     "test:e2e": "playwright test",
     "budgets": "node scripts/check-budgets.mjs",
     "dev:desktop": "node scripts/with-target.mjs desktop astro dev",
-    "build:desktop": "node scripts/with-target.mjs desktop astro build"
+    "build:desktop": "node scripts/with-target.mjs desktop astro build",
+    "check-ads": "node scripts/check-ads.mjs",
+    "test:ads": "node scripts/ads-smoke.mjs"
   },
   "dependencies": {
     "@jsquash/avif": "^2.1.1",

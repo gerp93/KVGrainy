@@ -1,3 +1,0 @@
-# Not launched yet: keep search engines out until the owner says go.
-User-agent: *
-Disallow: /

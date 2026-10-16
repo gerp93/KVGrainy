@@ -44,6 +44,9 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run budgets
+      # The ad rules: no slot on the tool page or the content-free pages, and a placeholder can never be deployed.
+      - run: npm run check-ads
+      - run: npm run test:ads
       - run: npx playwright install --with-deps chromium
       # Playwright builds and serves the site itself (playwright.config.ts).
       - run: npx playwright test
