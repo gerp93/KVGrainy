@@ -184,3 +184,39 @@ fn search_runs_on_a_custom_encoder() {
     assert!(counting.decodes.load(Ordering::Relaxed) > 0, "scoring never decoded through the custom encoder");
     assert_eq!(custom.bytes, native.bytes, "a delegating encoder must not change the result");
 }
+
+#[test]
+fn impossible_limit_still_yields_a_best_effort_file() {
+    let image = noise(200, 200);
+    let options = Options::new(10);
+    assert!(matches!(optimize(&image, &options, &no_progress), Err(Error::NothingFits { .. })));
+    let best = kvgrainy_core::best_effort(&image, &options).expect("a best-effort output");
+    assert!(best.bytes.len() as u64 > 10, "over the limit by definition");
+    let decoded = kvgrainy_core::NativeEncoder.decode(best.format, &best.bytes).expect("decodable");
+    assert!(decoded.width > 0 && decoded.height > 0);
+    // It is the smallest on offer: no candidate format at that scale and quality is smaller.
+    for format in [Format::Jpeg, Format::Webp, Format::Avif, Format::Png] {
+        let q = if format.has_quality() { 20 } else { 100 };
+        let other = encode(format, &image.scaled(0.3), q).unwrap();
+        assert!(best.bytes.len() <= other.len(), "{format:?} was smaller ({} < {})", other.len(), best.bytes.len());
+    }
+}
+
+#[test]
+fn same_input_and_settings_give_byte_identical_output() {
+    let image = noise(120, 90);
+    for effort in [kvgrainy_core::Effort::Best, kvgrainy_core::Effort::Quick] {
+        let options = || Options { effort, ..Options::new(6 * 1024) };
+        let first = optimize(&image, &options(), &no_progress).unwrap();
+        let second = optimize(&image, &options(), &no_progress).unwrap();
+        assert_eq!(first.bytes, second.bytes, "{effort:?} output differs between runs");
+        assert_eq!((first.format, first.scale, first.quality), (second.format, second.scale, second.quality));
+    }
+}
+
+#[test]
+fn quick_effort_never_picks_avif() {
+    let options = Options { effort: kvgrainy_core::Effort::Quick, ..Options::new(8 * 1024) };
+    let best = optimize(&noise(120, 90), &options, &no_progress).unwrap();
+    assert_ne!(best.format, Format::Avif);
+}

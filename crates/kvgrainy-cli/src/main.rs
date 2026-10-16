@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use kvgrainy_core::{load::load_image, optimize, parse_size_limit, Format, Options};
+use kvgrainy_core::{best_effort, load::load_image, optimize, parse_size_limit, Effort, Error, Format, Options};
 
 const IMAGE_EXTENSIONS: [&str; 7] = ["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif"];
 
@@ -21,6 +21,9 @@ struct Args {
     /// Force an output format (jpeg, png, webp, avif); default picks the best
     #[arg(long)]
     format: Option<String>,
+    /// Skip AVIF, the slowest codec: several times faster, usually slightly larger output
+    #[arg(long)]
+    quick: bool,
 }
 
 fn collect(paths: &[PathBuf]) -> Vec<PathBuf> {
@@ -95,7 +98,8 @@ fn main() -> ExitCode {
         for warning in &loaded.warnings {
             eprintln!("[warn] {name}: {warning}");
         }
-        let options = Options { format, ..Options::new(limit) };
+        let effort = if args.quick { Effort::Quick } else { Effort::Best };
+        let options = Options { format, effort, ..Options::new(limit) };
         match optimize(&loaded.raster, &options, &|_| {}) {
             Ok(best) => {
                 let stem = file.file_stem().unwrap_or_default().to_string_lossy();
@@ -114,6 +118,25 @@ fn main() -> ExitCode {
                     best.scale,
                     best.score
                 );
+            }
+            Err(why @ Error::NothingFits { .. }) => {
+                // Never leave the user with nothing: write the smallest output we can make, clearly marked over the limit.
+                match best_effort(&loaded.raster, &options) {
+                    Some(best) => {
+                        let stem = file.file_stem().unwrap_or_default().to_string_lossy();
+                        let out = args.output.join(format!("{stem}_optimized.{}", best.format.extension()));
+                        match std::fs::write(&out, &best.bytes) {
+                            Ok(()) => eprintln!(
+                                "[over limit] {name}: {why}. Wrote the smallest possible instead: {} ({:.1}KB)",
+                                out.file_name().unwrap_or_default().to_string_lossy(),
+                                best.bytes.len() as f64 / 1024.0
+                            ),
+                            Err(e) => eprintln!("[fail] {name}: {why}; cannot write {}: {e}", out.display()),
+                        }
+                    }
+                    None => eprintln!("[fail] {name}: {why}"),
+                }
+                failures += 1;
             }
             Err(why) => {
                 eprintln!("[fail] {name}: {why}");

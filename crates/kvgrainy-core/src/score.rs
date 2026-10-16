@@ -1,9 +1,21 @@
-//! Perceptual scoring of an encoded candidate against the original (SSIMULACRA2).
+//! Perceptual scoring of an encoded candidate against the original.
+//!
+//! Two scores, both measured on a copy of the original capped at [`SCORE_CAP_PIXELS`]
+//! (docs/metric-study.md): SSIMULACRA2 (the verdict, ~280 ms per score at the cap) and a
+//! luma-SSIM proxy (about 20x cheaper) that the search uses to rank candidates within one
+//! format. Capping bounds memory and time regardless of source size: a 12 MP photo needs
+//! about 240 MB to score in WASM instead of about 2 GB.
+
+use std::borrow::Cow;
 
 use ssimulacra2::{compute_frame_ssimulacra2, ColorPrimaries, Rgb, TransferCharacteristic};
 
 use crate::encode::{Encoder, Format};
+use crate::proxy::{ProxyKind, ProxyRef};
 use crate::raster::Raster;
+
+/// Scoring works on a copy of the original with at most this many pixels.
+pub const SCORE_CAP_PIXELS: f64 = 1_000_000.0;
 
 /// The original, prepared once so scoring many candidates doesn't redo the conversion.
 pub struct Reference {
@@ -11,18 +23,47 @@ pub struct Reference {
     height: u32,
     flat: Vec<u8>,
     xyb_input: Option<Rgb>,
+    proxy: ProxyRef,
+}
+
+/// Dimensions of `width` x `height` reduced (keeping aspect ratio) to at most `cap` pixels.
+fn capped_dims(width: u32, height: u32, cap: f64) -> (u32, u32) {
+    let pixels = width as f64 * height as f64;
+    if pixels <= cap {
+        return (width, height);
+    }
+    let factor = (cap / pixels).sqrt();
+    (((width as f64 * factor) as u32).max(1), ((height as f64 * factor) as u32).max(1))
 }
 
 impl Reference {
     pub fn new(original: &Raster) -> Reference {
-        let flat = original.flattened_rgb();
-        let xyb_input = to_rgb(&flat, original.width, original.height);
-        Reference { width: original.width, height: original.height, flat, xyb_input }
+        Reference::with_cap(original, SCORE_CAP_PIXELS)
+    }
+
+    /// Like [`Reference::new`] with an explicit pixel cap. Use [`f64::INFINITY`] to score
+    /// at full resolution (slow and memory hungry; for tests and studies).
+    pub fn with_cap(original: &Raster, cap_pixels: f64) -> Reference {
+        let (width, height) = capped_dims(original.width, original.height, cap_pixels);
+        let base: Cow<Raster> = if (width, height) == (original.width, original.height) {
+            Cow::Borrowed(original)
+        } else {
+            Cow::Owned(original.resized(width, height))
+        };
+        let flat = base.flattened_rgb();
+        let xyb_input = to_rgb(&flat, width, height);
+        let proxy = ProxyRef::new(&base, ProxyKind::LumaSsim);
+        Reference { width, height, flat, xyb_input, proxy }
+    }
+
+    /// Dimensions candidates are compared at (the original's, or its capped copy's).
+    pub fn size(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 
     /// Visual similarity in `0.0..=1.0` (SSIMULACRA2 / 100, clamped); 1.0 is indistinguishable.
     ///
-    /// The candidate is decoded and scaled back to the original size first, so
+    /// The candidate is decoded and scaled to the reference size first, so
     /// downscaling is penalized by the metric itself. Transparency is judged
     /// composited over white. Images under 8x8 pixels, which SSIMULACRA2
     /// rejects, fall back to a pixel-error score.
@@ -39,7 +80,7 @@ impl Reference {
         }
     }
 
-    /// Score an already-decoded candidate (any size; it is scaled back to the original's).
+    /// Score an already-decoded candidate (any size; it is scaled to the reference size).
     pub fn score_raster(&self, decoded: &Raster) -> f64 {
         let decoded = decoded.resized(self.width, self.height);
         let distorted = decoded.flattened_rgb();
@@ -49,6 +90,21 @@ impl Reference {
             }
         }
         pixel_similarity(&self.flat, &distorted)
+    }
+
+    /// Cheap luma-SSIM similarity in `0.0..=1.0`, for ranking candidates of one format.
+    /// It orders candidates like [`Reference::score_with`] (see docs/metric-study.md) but its
+    /// values are not on the same scale; never compare the two.
+    pub fn proxy_with(&self, encoder: &dyn Encoder, payload: &[u8], format: Format) -> f64 {
+        match encoder.decode(format, payload) {
+            Some(decoded) => self.proxy_raster(&decoded),
+            None => 0.0,
+        }
+    }
+
+    /// Like [`Reference::proxy_with`] for an already-decoded candidate.
+    pub fn proxy_raster(&self, decoded: &Raster) -> f64 {
+        self.proxy.score(&decoded.resized(self.width, self.height))
     }
 }
 
@@ -70,4 +126,23 @@ fn pixel_similarity(a: &[u8], b: &[u8]) -> f64 {
         })
         .sum();
     (1.0 - (squares as f64 / a.len() as f64).sqrt() / 255.0).max(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::capped_dims;
+
+    #[test]
+    fn small_images_are_not_capped() {
+        assert_eq!(capped_dims(1000, 1000, 1_000_000.0), (1000, 1000));
+        assert_eq!(capped_dims(640, 480, 1_000_000.0), (640, 480));
+    }
+
+    #[test]
+    fn large_images_are_reduced_to_the_cap_keeping_aspect() {
+        let (w, h) = capped_dims(4000, 3000, 1_000_000.0);
+        assert!((w as f64 * h as f64) <= 1_000_000.0);
+        assert!(((w as f64 / h as f64) - 4.0 / 3.0).abs() < 0.01);
+        assert_eq!(capped_dims(10, 100_000_000, 1_000_000.0).0, 1);
+    }
 }
