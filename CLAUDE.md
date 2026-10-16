@@ -56,7 +56,9 @@ the auto-bump. Both call the local `release-desktop.yml`, which creates the
 GitHub Release and attaches the Tauri installers (see `docs/release.md`).
 Pushes that only touch docs, any `*.md`, tests, e2e specs or `*-ci.yml` workflows do not release
 (`paths:` filter, PLAN.md 5.4); UI changes do, because the desktop app embeds the web UI. To force a release with
-no other code change, edit `VERSION_BUMP.md` instead of pushing an empty commit. The old Python app is no longer
+no other code change, edit `VERSION_BUMP.md` instead of pushing an empty commit. A release first waits for the commit's own
+Web CI and Desktop CI (`gate` job, `scripts/wait_for_ci.py`); `cut-release.yml` is not gated. The website deploys to
+Cloudflare Pages from `deploy-web.yml` (inert until its secrets exist; setup in [docs/deploy.md](docs/deploy.md)). The old Python app is no longer
 built or released (and its source is deleted).
 
 ## Standards

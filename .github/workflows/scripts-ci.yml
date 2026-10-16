@@ -1,0 +1,16 @@
+name: Scripts CI
+
+# The Python tooling (release manifests, the CI gate used by releases and deploys). Standard library only.
+on:
+  pull_request:
+    paths: ["scripts/**", "tests/**", ".github/workflows/scripts-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["scripts/**", "tests/**", ".github/workflows/scripts-ci.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests -v

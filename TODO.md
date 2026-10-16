@@ -10,7 +10,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet. The plan the
 - Windows code-signing certificate and Apple Developer account; add the secrets in
   [docs/release.md](docs/release.md). Until then installers are unsigned (SmartScreen and Gatekeeper warn).
 - First winget submission, a Homebrew tap repository and (optionally) a Scoop bucket.
-- Domain, Cloudflare Pages, analytics, and every ad account (PLAN.md Phase 6).
+- Cloudflare account, domain, the two deploy secrets and the launch variable: the checklist is `docs/deploy.md`. Analytics and every ad account (PLAN.md Phase 6) are later.
 - Decide the brand and domain (PLAN.md D4) and whether the web tool launches (Phase 7).
 
 ## Features

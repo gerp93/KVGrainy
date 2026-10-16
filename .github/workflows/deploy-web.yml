@@ -1,0 +1,116 @@
+name: Deploy web
+
+# Builds the website and uploads it to Cloudflare Pages (docs/deploy.md has the one-time setup).
+#
+# Inert until you add two repository secrets, CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID: without them
+# the job says so and stops, and nothing is built or uploaded.
+#
+# - A push to main is the production deploy. It waits for this commit's Web CI to pass first.
+# - A pull request from this repository gets a preview deploy that search engines are told to ignore.
+# - Production is indexable only when the repository variable PUBLIC_LAUNCH is 1 (set it at launch).
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/deploy-web.yml"]
+  pull_request:
+    paths: ["web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/deploy-web.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Pull requests from forks and from Dependabot are never given secrets, so a preview for them could only fail.
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'kvgrainy' }}
+      PRODUCTION: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    steps:
+      - id: have
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Deploy skipped::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to deploy (docs/deploy.md)."
+          fi
+
+      - if: steps.have.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      # Never put a commit on the public site that has not passed its own tests.
+      - name: Wait for Web CI (production only)
+        if: steps.have.outputs.ready == 'true' && env.PRODUCTION == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/wait_for_ci.py --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" web-ci.yml
+
+      - if: steps.have.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - if: steps.have.outputs.ready == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - if: steps.have.outputs.ready == 'true'
+        uses: Swatinem/rust-cache@v2
+      # The CLI must match the wasm-bindgen version in Cargo.lock (scripts/build-wasm.mjs checks).
+      - id: bindgen
+        if: steps.have.outputs.ready == 'true'
+        run: echo "version=$(grep -A1 'name = "wasm-bindgen"' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
+      - id: bindgen-cache
+        if: steps.have.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ steps.bindgen.outputs.version }}
+      - if: steps.have.outputs.ready == 'true' && steps.bindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version ${{ steps.bindgen.outputs.version }} --locked
+      - if: steps.have.outputs.ready == 'true'
+        run: npm ci
+        working-directory: web
+
+      # PUBLIC_LAUNCH and PUBLIC_SITE_URL are repository *variables* (not secrets). Only the production deploy uses
+      # them; a preview is always built closed to search engines, whatever the variables say.
+      - name: Build
+        if: steps.have.outputs.ready == 'true'
+        working-directory: web
+        env:
+          VAR_LAUNCH: ${{ vars.PUBLIC_LAUNCH }}
+          VAR_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          KVG_DEPLOY: production
+        run: |
+          if [ "$PRODUCTION" = "true" ]; then
+            export PUBLIC_LAUNCH="$VAR_LAUNCH" PUBLIC_SITE_URL="$VAR_SITE_URL"
+          fi
+          npm run build
+          npm run budgets
+          npm run check-ads
+          # The one header that depends on the launch flag must say what the build was meant to say.
+          # (An explicit `if`, because `! grep` does not stop a bash -e script when it fails.)
+          if [ "$PUBLIC_LAUNCH" = "1" ]; then
+            if grep -qi 'x-robots-tag' dist/_headers; then echo "::error::A launch build must not send X-Robots-Tag"; exit 1; fi
+            if ! grep -q '^Allow: /' dist/robots.txt; then echo "::error::A launch build's robots.txt must allow crawling"; exit 1; fi
+            echo "Launch build: indexable."
+          else
+            if ! grep -qi 'x-robots-tag: noindex' dist/_headers; then echo "::error::A closed build must send X-Robots-Tag: noindex"; exit 1; fi
+            echo "Closed build: noindex."
+          fi
+
+      - name: Upload to Cloudflare Pages
+        if: steps.have.outputs.ready == 'true'
+        working-directory: web
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: npx --yes wrangler@4 pages deploy dist --project-name "$PROJECT" --branch "$BRANCH" --commit-hash "$GITHUB_SHA" --commit-dirty=true

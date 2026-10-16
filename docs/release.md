@@ -15,7 +15,13 @@ The old Python app is gone: it is no longer built or released, and its source wa
 remains in git history; see the last section). Copies already installed will not find newer releases, because
 releases no longer carry its files.
 
-`cut-release.yml` does the same for a version you choose (Actions tab, "Run workflow").
+**A release waits for its own CI.** The first job, `gate`, runs `scripts/wait_for_ci.py`, which waits for this commit's
+Web CI and Desktop CI workflows and stops the release if either failed (the desktop browser-driven `e2e` job is
+informational and cannot fail its workflow). A CI workflow only runs for the paths it lists, so a change none of them
+covers is released after a three-minute grace period instead of waiting forever. `scripts-ci.yml` tests the script itself.
+
+`cut-release.yml` does the same for a version you choose (Actions tab, "Run workflow"). It is **not** gated: it is the
+deliberate manual route.
 
 Changes that don't change the product do not cut a release (PLAN.md 5.4): docs, any `*.md`,
 tests, e2e specs, `web/src/content/**` (the future content pages) and `*-ci.yml` workflows. To force
