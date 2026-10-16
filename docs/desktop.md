@@ -79,7 +79,16 @@ builds and tests it on Windows.
 
 ## Not verified
 
-- macOS and Linux builds (the release workflow, Phase 5, builds all three; nothing here ran on them).
-- The NSIS installer and the Explorer menu entries: the hook is written but the installer was not built or
-  run locally.
+- macOS and Linux: the release workflow builds them, but nothing here has run on either (see docs/release.md).
 - Saving through the native dialog: the dialog cannot be automated; the Rust path is covered by review only.
+- The end-to-end tests do not run on a hosted GitHub runner: the app starts there but WebView2 never opens
+  its DevTools port. They pass on a developer machine, and the CI job is informational.
+
+## Verified on Windows 11 (2026-10-16)
+
+The NSIS installer was built (`npx tauri build --debug --bundles nsis`, 9.4 MB) and exercised: a silent per-user install
+registered "Reduce with KVGrainy" for both images and videos, pointing at the installed exe; the installed app passed
+`--smoke-test`; launching it the way Explorer does (`kvgrainy-desktop.exe "<file>"`) opened the window, loaded that file and
+reduced it; and a silent uninstall removed the registry entries and the install directory. Not exercised: the Explorer
+right-click menu itself (the registry entries and the launch it triggers were checked, not a click on a real file), and
+signed installers.

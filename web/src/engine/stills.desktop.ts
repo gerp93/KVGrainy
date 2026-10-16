@@ -26,7 +26,8 @@ export async function loadSource(file: Blob): Promise<Source> {
 interface Meta {
   outcome: 'ok' | 'nothing-fits' | 'cancelled' | 'not-animated';
   format?: OutputFormat;
-  quality?: number;
+  /** `null` for a format without a quality (lossless PNG): Rust serializes its `None` that way. */
+  quality?: number | null;
   scale: number;
   score: number;
   limit: number;
@@ -68,7 +69,7 @@ export async function optimizeImage(
     if (meta.outcome === 'cancelled') throw new DOMException('Cancelled', 'AbortError');
     onProgress(1);
     if (meta.outcome === 'ok' && meta.format) {
-      return { ok: true, candidate: { bytes, format: meta.format, quality: meta.quality, scale: meta.scale, score: meta.score } };
+      return { ok: true, candidate: { bytes, format: meta.format, quality: meta.quality ?? undefined, scale: meta.scale, score: meta.score } };
     }
     return {
       ok: false,

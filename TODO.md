@@ -28,7 +28,7 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet. The plan the
 ## Verification gaps
 
 - Safari, Firefox and phones for the web tool; only Chromium is tested. Large-photo memory limits.
-- macOS and Linux desktop builds, the NSIS installer and the Explorer menu entries, and the native Save dialog.
+- macOS and Linux desktop builds, a real right-click in Explorer, and the native Save dialog. (The NSIS installer, its registry entries, the installed app and the uninstall were verified on Windows; see docs/desktop.md.)
 - Compare size and quality against Squoosh and TinyPNG on 20 real images (PLAN.md Phase 3 acceptance),
   and against cjpeg, cwebp, avifenc, oxipng, pngquant, gifski and ffmpeg (PLAN.md 0.3 and 2.5). None
   of those tools are installed on the dev machine; `scripts/benchmark.py` is ready for them.

@@ -112,6 +112,19 @@ test('an animated GIF is fitted natively as a GIF', async () => {
   expect(bytes).toBeLessThanOrEqual(40 * 1024);
 });
 
+test('a generous limit gives a lossless PNG, described as lossless', async () => {
+  await reduce('native-lossless.png', photoPng(200, 150), '4000');
+  const card = finished('native-lossless.png');
+  await expect(card).toBeVisible();
+  await expect(card.getByText(/PNG · lossless/)).toBeVisible();
+});
+
+test('no result card shows a placeholder value such as "null" or "undefined"', async () => {
+  // Native results cross a JSON boundary (Rust None becomes null); the cards must read as words, not leaked values.
+  const text = await page.locator('#finished-list').innerText();
+  expect(text).not.toMatch(/(null|undefined|NaN)/);
+});
+
 test('a second launch with a file hands it to the open window', async () => {
   const path = join(work, 'from-explorer.png');
   writeFileSync(path, flatPng(320, 240));
