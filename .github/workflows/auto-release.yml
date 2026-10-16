@@ -1,13 +1,28 @@
-# Fires a release on every push to main — see gerp93/KVG_Standards'
+# Fires a release on every push to main that changes the product — see gerp93/KVG_Standards'
 # templates/auto-release.yml for the full rationale. Coexists with
 # cut-release.yml (manual, explicit version); this is the default,
 # always-on path.
+#
+# Docs, markdown, tests and CI-only changes don't change what users get, so they don't cut a
+# release (PLAN.md 5.4). The web UI is shared with the desktop app, so UI changes do. To force a
+# release anyway, edit VERSION_BUMP.md (the last pattern re-includes it after the markdown exclusion).
 
 name: Auto Release
 
 on:
   push:
     branches: [main]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - 'VERSION_BUMP.md'
+      - '!web/tests/**'
+      - '!web/e2e/**'
+      - '!desktop/e2e/**'
+      - '!tests/**'
+      - '!web/src/content/**'
+      - '!.github/workflows/*-ci.yml'
 
 permissions:
   contents: write
@@ -30,6 +45,7 @@ jobs:
           default_bump: patch
           release_branches: main
 
+  # The Python app, until PLAN.md 5.6 retires it. It creates the GitHub release.
   release:
     needs: version
     if: ${{ needs.version.outputs.new_tag != '' }}
@@ -42,5 +58,16 @@ jobs:
       version_file: _version.py
       extra_add_data: 'assets:assets'
       icon_path: 'assets/icon'
+    permissions:
+      contents: write
+
+  # The Tauri app, attached to the release the job above made.
+  desktop:
+    needs: [version, release]
+    if: ${{ needs.version.outputs.new_tag != '' }}
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      version: ${{ needs.version.outputs.new_tag }}
+    secrets: inherit
     permissions:
       contents: write

@@ -67,3 +67,12 @@ jobs:
       icon_path: 'assets/icon'
     permissions:
       contents: write
+
+  desktop:
+    needs: [tag, release]
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      version: ${{ needs.tag.outputs.version }}
+    secrets: inherit
+    permissions:
+      contents: write

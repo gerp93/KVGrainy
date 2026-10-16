@@ -11,11 +11,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use kvgrainy_core::load::decode;
-use kvgrainy_core::{best_effort, optimize, Effort, Error, Format, Options, Progress};
+use kvgrainy_core::raster::Raster;
+use kvgrainy_core::{best_effort, optimize, Effort, Encoder, Error, Format, NativeEncoder, Options, Progress};
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 /// Extensions the app opens from the command line (Explorer's "Reduce with KVGrainy", "Open with").
 const OPENABLE: [&str; 14] =
@@ -213,6 +214,127 @@ fn read_file(allowed: State<'_, Allowed>, path: String) -> Result<Response, Stri
     std::fs::read(&path).map(Response::new).map_err(|e| format!("could not read {path}: {e}"))
 }
 
+/// Where releases are published. The check reads the newest one and compares its tag with this build.
+const LATEST_RELEASE_API: &str = "https://api.github.com/repos/gerp93/KVGrainy/releases/latest";
+
+/// `major.minor.patch` from a tag such as `v1.2.3` (anything after a `-` or `+` is ignored).
+fn parse_version(text: &str) -> Option<(u64, u64, u64)> {
+    let core = text.trim().trim_start_matches('v').split(['-', '+']).next()?;
+    let mut parts = core.split('.').map(|p| p.parse::<u64>());
+    Some((parts.next()?.ok()?, parts.next()?.ok()?, parts.next()?.ok()?))
+}
+
+fn is_newer(latest: &str, current: &str) -> bool {
+    matches!((parse_version(latest), parse_version(current)), (Some(l), Some(c)) if l > c)
+}
+
+/// The newest release's tag and page, from GitHub.
+fn latest_release() -> Result<(String, String), String> {
+    let mut response = ureq::get(LATEST_RELEASE_API)
+        .header("User-Agent", concat!("kvgrainy-desktop/", env!("CARGO_PKG_VERSION")))
+        .header("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| e.to_string())?;
+    let release: serde_json::Value = response.body_mut().read_json().map_err(|e| e.to_string())?;
+    let tag = release["tag_name"].as_str().ok_or("the release has no tag")?.to_string();
+    let url = release["html_url"].as_str().ok_or("the release has no page")?.to_string();
+    Ok((tag, url))
+}
+
+/// Look for a newer release and offer to open its download page. `silent` is the start-up check:
+/// it says nothing unless there is a newer release.
+///
+/// This does not download or install anything. Tauri's own updater plugin would, but every
+/// version of it depends on a `zip` crate release that has been yanked, so it cannot be built
+/// right now (docs/release.md); installing from the release page keeps a human in the loop until then.
+async fn check_for_updates_inner(app: AppHandle, silent: bool) -> Result<(), String> {
+    let checked = tauri::async_runtime::spawn_blocking(latest_release).await.map_err(|e| e.to_string())?;
+    let (tag, url) = match checked {
+        Ok(found) => found,
+        Err(_) if silent => return Ok(()),
+        Err(error) => return Err(format!("could not check for updates: {error}")),
+    };
+    let current = app.package_info().version.to_string();
+    let dialog = app.clone();
+    if !is_newer(&tag, &current) {
+        if !silent {
+            let message = format!("You're running the latest version ({current}).");
+            let _ = tauri::async_runtime::spawn_blocking(move || dialog.dialog().message(message).title("Up to date").blocking_show()).await;
+        }
+        return Ok(());
+    }
+    let message = format!("KVGrainy {tag} is available (you have {current}).\n\nOpen the download page?");
+    let open = tauri::async_runtime::spawn_blocking(move || {
+        dialog
+            .dialog()
+            .message(message)
+            .title("Update available")
+            .buttons(MessageDialogButtons::OkCancelCustom("Open download page".into(), "Later".into()))
+            .blocking_show()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if open {
+        tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// "Check for updates" from the UI.
+#[tauri::command]
+async fn check_for_updates(app: AppHandle) -> Result<(), String> {
+    check_for_updates_inner(app, false).await
+}
+
+/// `--smoke-test <report file>`: encode and decode a small image with every native codec and run a
+/// whole search, write what happened to the report, and return the process exit code (0 = all
+/// worked). Release builds run this on the packaged binary in CI, so a missing codec or a broken
+/// build fails the release instead of reaching users. No window is opened.
+fn smoke_test(report: &str) -> i32 {
+    let (width, height) = (96u32, 64u32);
+    let mut rgb = Vec::with_capacity((width * height * 3) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            rgb.extend([(x * 255 / width) as u8, (y * 255 / height) as u8, ((x + y) * 255 / (width + height)) as u8]);
+        }
+    }
+    let raster = Raster { width, height, rgb, alpha: None };
+    let mut lines = vec![format!("kvgrainy-desktop {}", env!("CARGO_PKG_VERSION"))];
+    let mut failed = false;
+    for format in [Format::Jpeg, Format::Webp, Format::Avif, Format::Png, Format::PngPalette] {
+        let outcome = NativeEncoder.encode(format, &raster, 70).and_then(|bytes| {
+            let decoded = NativeEncoder.decode(format, &bytes).ok_or("could not decode its own output")?;
+            if (decoded.width, decoded.height) == (width, height) && !bytes.is_empty() {
+                Ok(bytes.len())
+            } else {
+                Err("decoded to the wrong size".to_string())
+            }
+        });
+        match outcome {
+            Ok(size) => lines.push(format!("ok   {format:?}: {size} bytes")),
+            Err(why) => {
+                failed = true;
+                lines.push(format!("FAIL {format:?}: {why}"));
+            }
+        }
+    }
+    let options = Options { effort: Effort::Quick, ..Options::new(4096) };
+    match optimize(&raster, &options, &|_| {}) {
+        Ok(best) if best.bytes.len() <= 4096 => lines.push(format!("ok   search: {:?}, {} bytes", best.format, best.bytes.len())),
+        Ok(best) => {
+            failed = true;
+            lines.push(format!("FAIL search: {} bytes is over the 4096 limit", best.bytes.len()));
+        }
+        Err(why) => {
+            failed = true;
+            lines.push(format!("FAIL search: {why}"));
+        }
+    }
+    lines.push(if failed { "FAILED".into() } else { "PASSED".into() });
+    let _ = std::fs::write(report, lines.join("\n") + "\n");
+    i32::from(failed)
+}
+
 /// Command-line arguments that are existing image or video files.
 fn openable(args: &[String]) -> Vec<String> {
     args.iter()
@@ -254,6 +376,10 @@ fn hand_over(app: &AppHandle, files: Vec<String>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(at) = args.iter().position(|a| a == "--smoke-test") {
+        std::process::exit(smoke_test(args.get(at + 1).map_or("smoke-test.txt", String::as_str)));
+    }
     tauri::Builder::default()
         // A second launch (a right-click on another file) goes to the window that is already open.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -273,6 +399,14 @@ pub fn run() {
             let files = openable(&args);
             app.state::<Allowed>().0.lock().expect("allow list").extend(files.iter().cloned());
             *app.state::<Pending>().0.lock().expect("pending list") = files;
+            // A quiet check at start-up; development builds have no release to compare with.
+            #[cfg(not(debug_assertions))]
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = check_for_updates_inner(handle, true).await;
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -281,7 +415,8 @@ pub fn run() {
             save_file,
             reveal_in_folder,
             take_pending_files,
-            read_file
+            read_file,
+            check_for_updates
         ])
         .run(tauri::generate_context!())
         .expect("error while running KVGrainy");
@@ -297,6 +432,26 @@ mod tests {
         assert_eq!(percent_decode("%E2%9C%93.jpg"), "\u{2713}.jpg");
         assert_eq!(percent_decode("100%.png"), "100%.png");
         assert_eq!(percent_decode("%zz"), "%zz");
+    }
+
+    #[test]
+    fn version_comparison_follows_semver_order() {
+        assert!(is_newer("v0.2.0", "0.1.9"));
+        assert!(is_newer("v1.0.0", "0.99.99"));
+        assert!(is_newer("v0.1.10", "0.1.9"));
+        assert!(!is_newer("v0.1.0", "0.1.0"));
+        assert!(!is_newer("v0.1.0", "0.2.0"));
+        assert!(!is_newer("nightly", "0.1.0"));
+        assert_eq!(parse_version("v1.2.3-rc.1"), Some((1, 2, 3)));
+    }
+
+    #[test]
+    fn the_smoke_test_passes_with_the_native_codecs() {
+        let report = std::env::temp_dir().join(format!("kvgrainy-smoke-{}.txt", std::process::id()));
+        assert_eq!(smoke_test(report.to_str().unwrap()), 0, "{}", std::fs::read_to_string(&report).unwrap_or_default());
+        let text = std::fs::read_to_string(&report).unwrap();
+        assert!(text.contains("PASSED") && text.contains("PngPalette") && text.contains("Avif"), "{text}");
+        std::fs::remove_file(report).unwrap();
     }
 
     #[test]

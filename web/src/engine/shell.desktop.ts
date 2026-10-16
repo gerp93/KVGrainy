@@ -84,6 +84,30 @@ async function toFile(path: string): Promise<File> {
   return new File([bytes], name, { type: MIME[name.split('.').pop()?.toLowerCase() ?? ''] ?? '' });
 }
 
+// ---- Updates: a link in the footer ---------------------------------------------------------
+
+function addUpdateButton() {
+  const footer = document.querySelector('footer');
+  if (!footer) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn';
+  button.textContent = 'Check for updates';
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await invoke('check_for_updates');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      button.disabled = false;
+    }
+  });
+  footer.append(button);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addUpdateButton);
+else addUpdateButton();
+
 export const shell: Shell = {
   onOpenFiles(callback) {
     const open = async (paths: string[]) => {

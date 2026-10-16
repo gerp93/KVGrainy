@@ -53,7 +53,8 @@ standalone commit — see that doc.
 > (search, scoring, colour, codecs behind an `Encoder` trait) is shared by `crates/kvgrainy-cli`
 > and by the web tool, which compiles it to WebAssembly (`crates/kvgrainy-wasm`) and supplies
 > browser codecs; see [docs/web.md](docs/web.md). The desktop app (`desktop/`, Tauri) hosts the same
-> UI and calls the core natively; see [docs/desktop.md](docs/desktop.md). The core handles still images only. The
+> UI and calls the core natively; see [docs/desktop.md](docs/desktop.md). Releases, signing secrets,
+> the smoke test and package-manager manifests are in [docs/release.md](docs/release.md). The core handles still images only. The
 > Python engine below remains the shipped desktop app and the reference for GIF and video.
 
 KVGrainy has two independent entry points sharing one optimization engine:
