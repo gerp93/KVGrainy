@@ -2,8 +2,9 @@
 
 KVGrainy is licensed under the GNU Affero General Public License v3.0 (see `LICENSE`).
 
-This file lists the Rust crates compiled into `kvgrainy-core` and `kvgrainy-cli` (the runtime
-dependency closure, all targets, with default features). It is generated from `cargo metadata`;
+This file lists the Rust crates compiled into `kvgrainy-core`, `kvgrainy-cli` and `kvgrainy-wasm` (the
+runtime dependency closure, all targets, with default features), then the web app's runtime npm
+packages. It is generated from `cargo metadata`;
 regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changing dependencies.
 
 ## Compatibility notes
@@ -13,7 +14,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 - **GPL-3.0-or-later** (`imagequant`, palette PNG): GPLv3 section 13 allows combining it with AGPL-3.0, which KVGrainy is. Anyone distributing KVGrainy as a whole must follow the AGPL-3.0, which this licence permits. It also means KVGrainy cannot be relicensed under a more permissive licence while it includes imagequant.
 - **`r-efi`** is offered under `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; KVGrainy uses it under MIT.
 - **mozjpeg** (`IJG AND Zlib AND BSD-3-Clause`) and **libwebp** (BSD-3-Clause) are C libraries built from source by their `-sys` crates on native targets only.
-- Not yet included: the Tauri shell, the web app's npm packages, and any bundled ffmpeg. Add them here when they ship (ffmpeg builds must be LGPL-configured or the combination documented).
+- Not yet included: the Tauri shell and any bundled ffmpeg. Add them here when they ship (ffmpeg builds must be LGPL-configured or the combination documented).
 
 ## Crates
 
@@ -56,6 +57,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | clap_lex | 1.1.1 | MIT OR Apache-2.0 |
 | color_quant | 1.1.0 | MIT |
 | colorchoice | 1.0.5 | MIT OR Apache-2.0 |
+| console_error_panic_hook | 0.1.7 | Apache-2.0/MIT |
 | crc32fast | 1.5.2 | MIT OR Apache-2.0 |
 | crossbeam-deque | 0.8.8 | MIT OR Apache-2.0 |
 | crossbeam-epoch | 0.9.21 | MIT OR Apache-2.0 |
@@ -71,6 +73,9 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | fax | 0.2.7 | MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
+| futures-core | 0.3.34 | MIT OR Apache-2.0 |
+| futures-task | 0.3.34 | MIT OR Apache-2.0 |
+| futures-util | 0.3.34 | MIT OR Apache-2.0 |
 | getrandom | 0.3.4 | MIT OR Apache-2.0 |
 | gif | 0.14.2 | MIT OR Apache-2.0 |
 | half | 2.7.1 | MIT OR Apache-2.0 |
@@ -84,6 +89,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | interpolate_name | 0.2.4 | MIT |
 | is_terminal_polyfill | 1.70.2 | MIT OR Apache-2.0 |
 | itertools | 0.14.0 | MIT OR Apache-2.0 |
+| js-sys | 0.3.106 | MIT OR Apache-2.0 |
 | leb128 | 0.2.7 | MIT OR Apache-2.0 |
 | libaom-sys | 0.17.2+libaom.3.11.0 | BSD-2-Clause |
 | libc | 0.2.190 | MIT OR Apache-2.0 |
@@ -117,6 +123,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | oxipng | 10.2.1 | MIT |
 | paste | 1.0.15 | MIT OR Apache-2.0 |
 | pastey | 0.1.1 | MIT OR Apache-2.0 |
+| pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | png | 0.18.1 | MIT OR Apache-2.0 |
 | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
@@ -137,6 +144,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | simd-adler32 | 0.3.10 | MIT |
 | simd_helpers | 0.1.0 | MIT |
+| slab | 0.4.12 | MIT |
 | ssimulacra2 | 0.5.1 | BSD-2-Clause |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
 | strsim | 0.11.1 | MIT |
@@ -167,3 +175,18 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | zlib-rs | 0.6.8 | Zlib |
 | zune-core | 0.5.3 | MIT OR Apache-2.0 OR Zlib |
 | zune-jpeg | 0.5.15 | MIT OR Apache-2.0 OR Zlib |
+
+## Web app (npm, direct runtime dependencies)
+
+Codecs are the jSquash WebAssembly builds of mozjpeg, libwebp, libavif, oxipng and libpng.
+
+| Package | Version | Licence |
+|---|---|---|
+| @jsquash/avif | 2.1.1 | Apache-2.0 |
+| @jsquash/jpeg | 1.6.0 | Apache-2.0 |
+| @jsquash/oxipng | 2.3.0 | Apache-2.0 |
+| @jsquash/png | 3.1.1 | Apache-2.0 |
+| @jsquash/resize | 2.1.1 | Apache-2.0 |
+| @jsquash/webp | 1.5.0 | Apache-2.0 |
+| astro | 7.3.8 | MIT |
+| gifenc | 1.0.3 | MIT |

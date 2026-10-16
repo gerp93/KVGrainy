@@ -51,6 +51,12 @@ pub trait Encoder: Sync {
     /// Decode an output this encoder produced, so the scorer can compare it to the
     /// original. `None` if the payload cannot be decoded (it then scores 0).
     fn decode(&self, format: Format, payload: &[u8]) -> Option<Raster>;
+
+    /// Whether this encoder can produce `format`. The search skips formats it cannot (a
+    /// browser build has no palette-PNG quantizer, for one).
+    fn supports(&self, _format: Format) -> bool {
+        true
+    }
 }
 
 /// Encode with the native codecs. Shorthand for `NativeEncoder.encode(..)`.

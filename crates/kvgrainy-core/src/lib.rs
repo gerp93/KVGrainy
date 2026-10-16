@@ -23,4 +23,7 @@ pub use limit::parse_size_limit;
 pub use native::NativeEncoder;
 #[cfg(feature = "native")]
 pub use search::{best_effort, optimize};
-pub use search::{best_effort_with, optimize_with, Candidate, Effort, Error, Options, Progress};
+pub use search::{
+    best_effort_with, candidate_formats, optimize_with, pick_best, pick_best_of, search_one_format, Candidate, Effort, Error,
+    FormatOutcome, Options, Progress, SCALE_FACTORS,
+};

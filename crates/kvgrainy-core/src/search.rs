@@ -61,8 +61,8 @@ pub enum Error {
     NothingFits { limit: u64, smallest: u64 },
 }
 
-/// The formats [`optimize_with`] would try for `source` under `options`.
-fn candidate_formats(source: &Raster, options: &Options) -> Vec<Format> {
+/// The formats [`optimize_with`] would try for `source` under `options` with `encoder`.
+pub fn candidate_formats(encoder: &dyn Encoder, source: &Raster, options: &Options) -> Vec<Format> {
     let mut formats = match options.format {
         // A forced PNG still lets the search choose between lossless and palette.
         Some(Format::Png | Format::PngPalette) => vec![Format::Png, Format::PngPalette],
@@ -73,13 +73,56 @@ fn candidate_formats(source: &Raster, options: &Options) -> Vec<Format> {
     if options.effort == Effort::Quick && options.format.is_none() {
         formats.retain(|&f| f != Format::Avif);
     }
+    formats.retain(|&f| encoder.supports(f));
     formats
 }
 
-struct TaskResult {
-    best: Option<Candidate>,
-    smallest: u64,
+/// What the search for one format produced.
+pub struct FormatOutcome {
+    /// The best candidate under the limit, if any scale fit.
+    pub best: Option<Candidate>,
+    /// Size in bytes of the smallest output tried, `u64::MAX` if none was.
+    pub smallest: u64,
 }
+
+/// Search one format only. [`optimize_with`] runs this per format (on a thread pool when the
+/// `parallel` feature is on); a host with its own parallelism, such as a browser running one
+/// worker per format, calls it directly and combines the results with [`pick_best`].
+///
+/// `report` gets the number of scale steps just completed; a format's total is
+/// [`SCALE_FACTORS`]`.len()`. `cancelled` is polled between encodes.
+pub fn search_one_format(
+    encoder: &dyn Encoder,
+    source: &Raster,
+    options: &Options,
+    format: Format,
+    cancelled: &dyn Fn() -> bool,
+    report: &dyn Fn(usize),
+) -> FormatOutcome {
+    let reference = Reference::new(source);
+    let result = search_format(encoder, &reference, source, options, format, cancelled, report);
+    FormatOutcome { best: result.best, smallest: result.smallest }
+}
+
+/// The index of the best candidate: highest score, where scores within 0.1 SSIMULACRA2 points
+/// are a tie, so noise can't pick a needlessly smaller image; ties go to the higher scale, then
+/// the larger file (closer to the budget). A visually lossless tie goes to the smaller file.
+pub fn pick_best(candidates: &[Candidate]) -> Option<usize> {
+    pick_best_of(candidates.iter().map(|c| (c.score, c.scale, c.bytes.len())))
+}
+
+/// [`pick_best`] over `(score, scale, size in bytes)` triples, for callers that don't hold the bytes.
+pub fn pick_best_of(items: impl Iterator<Item = (f64, f32, usize)>) -> Option<usize> {
+    items
+        .enumerate()
+        .max_by_key(|&(_, (score, scale, bytes))| {
+            let size = bytes as i64;
+            ((score * 1000.0).round() as i64, (scale * 100.0).round() as i32, if score >= VISUALLY_LOSSLESS { -size } else { size })
+        })
+        .map(|(i, _)| i)
+}
+
+type TaskResult = FormatOutcome;
 
 /// Search with the native codecs. Shorthand for [`optimize_with`] and [`NativeEncoder`].
 #[cfg(feature = "native")]
@@ -94,7 +137,7 @@ pub fn optimize_with(
     options: &Options,
     progress: &(dyn Fn(Progress) + Sync),
 ) -> Result<Candidate, Error> {
-    let formats = candidate_formats(source, options);
+    let formats = candidate_formats(encoder, source, options);
     let total = formats.len() * SCALE_FACTORS.len();
     let done = AtomicUsize::new(0);
     let report = |steps: usize| {
@@ -116,18 +159,11 @@ pub fn optimize_with(
         return Err(Error::Cancelled);
     }
     let smallest = results.iter().map(|r| r.smallest).min().unwrap_or(u64::MAX);
-    let bests: Vec<Candidate> = results.into_iter().filter_map(|r| r.best).collect();
-    bests
-        .into_iter()
-        .max_by_key(|c| {
-            // Scores within 0.1 SSIMULACRA2 points are a tie, so noise can't pick a
-            // needlessly smaller image; ties go to the higher scale, then the larger file
-            // (closer to the budget). A visually lossless tie goes to the smaller file instead.
-            let lossless = c.score >= VISUALLY_LOSSLESS;
-            let size = c.bytes.len() as i64;
-            ((c.score * 1000.0).round() as i64, (c.scale * 100.0).round() as i32, if lossless { -size } else { size })
-        })
-        .ok_or(Error::NothingFits { limit: options.limit_bytes, smallest })
+    let mut bests: Vec<Candidate> = results.into_iter().filter_map(|r| r.best).collect();
+    match pick_best(&bests) {
+        Some(index) => Ok(bests.swap_remove(index)),
+        None => Err(Error::NothingFits { limit: options.limit_bytes, smallest }),
+    }
 }
 
 /// The smallest output this search can make, for when [`optimize_with`] reports
@@ -138,7 +174,7 @@ pub fn best_effort_with(encoder: &dyn Encoder, source: &Raster, options: &Option
     let scale = SCALE_FACTORS[SCALE_FACTORS.len() - 1];
     let resized = source.scaled(scale);
     let mut smallest: Option<Candidate> = None;
-    for format in candidate_formats(source, options) {
+    for format in candidate_formats(encoder, source, options) {
         let quality = format.has_quality().then_some(MIN_QUALITY);
         let Ok(bytes) = encoder.encode(format, &resized, quality.unwrap_or(100)) else { continue };
         if smallest.as_ref().is_none_or(|c| bytes.len() < c.bytes.len()) {

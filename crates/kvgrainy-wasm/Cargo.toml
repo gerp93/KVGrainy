@@ -1,0 +1,19 @@
+[package]
+name = "kvgrainy-wasm"
+description = "The shared KVGrainy search core for the browser: wasm-bindgen bindings over kvgrainy-core, with codecs supplied by JavaScript"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+kvgrainy-core = { path = "../kvgrainy-core", default-features = false }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.129"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"

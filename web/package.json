@@ -9,7 +9,14 @@
     "build": "astro build",
     "preview": "astro preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "wasm": "node scripts/build-wasm.mjs",
+    "predev": "npm run wasm",
+    "prebuild": "npm run wasm",
+    "pretypecheck": "npm run wasm",
+    "pretest": "npm run wasm",
+    "test:e2e": "playwright test",
+    "budgets": "node scripts/check-budgets.mjs"
   },
   "dependencies": {
     "@jsquash/avif": "^2.1.1",
@@ -22,6 +29,9 @@
     "gifenc": "^1.0.3"
   },
   "devDependencies": {
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.4"

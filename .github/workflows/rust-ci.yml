@@ -33,3 +33,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p kvgrainy-core --no-default-features --target wasm32-unknown-unknown
       - run: cargo check -p kvgrainy-wasm-spike --target wasm32-unknown-unknown
+      - run: cargo check -p kvgrainy-wasm --target wasm32-unknown-unknown
