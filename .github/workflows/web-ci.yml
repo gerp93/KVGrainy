@@ -1,0 +1,55 @@
+name: Web CI
+
+# The web tool: typecheck, unit tests that run the real Rust core in WebAssembly with the real
+# browser codecs, the production build, bundle-size budgets, and Playwright tests in Chromium
+# (including the privacy test: no request carries image data, none leaves the origin).
+on:
+  pull_request:
+    paths: ["web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/web-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/web-ci.yml"]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # The CLI must match the wasm-bindgen version in Cargo.lock (scripts/build-wasm.mjs checks).
+      - id: bindgen
+        working-directory: .
+        run: echo "version=$(grep -A1 'name = "wasm-bindgen"' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: bindgen-cache
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ steps.bindgen.outputs.version }}
+      - if: steps.bindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version ${{ steps.bindgen.outputs.version }} --locked
+      - run: npm ci
+      # `npm run typecheck`, `test` and `build` each build the Rust core first (their pre-scripts).
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run budgets
+      - run: npx playwright install --with-deps chromium
+      # Playwright builds and serves the site itself (playwright.config.ts).
+      - run: npx playwright test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: web/test-results
+          retention-days: 7

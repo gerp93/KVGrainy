@@ -1,20 +1,23 @@
-import { jsquashCodec } from './codecs';
 import { searchGif } from './gif';
-import { Reference } from './metric';
-import { searchFormat } from './search';
+import type { Effort } from './search';
+import { createSyncCodec } from './syncCodec';
 import type { Format, FormatResult } from './types';
 import { searchAnimatedWebp } from './webpanim';
+import init, { Source, bestEffort, initPanicHook, searchFormat } from '../wasm/kvgrainy_wasm.js';
 
 /**
  * Runs one search off the main thread: either a single still format, or the GIF search for an
  * animation. For stills the main thread starts one of these per format, in parallel, with no
- * shared memory.
+ * shared memory. A still search is the shared Rust core (crates/kvgrainy-core, via
+ * crates/kvgrainy-wasm) calling this format's synchronous codec; cancelling means terminating
+ * the worker, since the core never yields to the event loop.
  */
 
 export interface StartMessage {
   type: 'start';
   format: Format;
   limit: number;
+  effort: Effort;
   width: number;
   height: number;
   data: ArrayBuffer;
@@ -71,12 +74,40 @@ scope.onmessage = async (event) => {
       scope.postMessage({ type: 'done', result });
       return;
     }
-    const source = { width: msg.width, height: msg.height, data: new Uint8ClampedArray(msg.data) };
-    const factor = Reference.analysisFactor(source.width, source.height);
-    const analysis = factor < 1 ? await jsquashCodec.scale(source, factor) : source;
-    const reference = new Reference(analysis);
-    const result = await searchFormat(jsquashCodec, reference, source, msg.limit, msg.format, progress);
-    scope.postMessage({ type: 'done', result });
+    await init();
+    initPanicHook();
+    const codec = await createSyncCodec(msg.format);
+    const source = Source.fromRgba(msg.width, msg.height, new Uint8Array(msg.data));
+    try {
+      const outcome = searchFormat(source, codec, msg.format, msg.limit, msg.effort, progress.report);
+      let result: FormatResult;
+      if (outcome.found) {
+        const quality = outcome.quality;
+        result = {
+          best: {
+            bytes: outcome.bytes,
+            format: outcome.format as Format,
+            quality: quality >= 0 ? quality : undefined,
+            scale: outcome.scale,
+            score: outcome.score,
+          },
+          smallest: outcome.smallest,
+        };
+      } else {
+        // Nothing fit: offer the smallest this format can make, clearly over the limit.
+        const fallback = bestEffort(source, codec, msg.format, msg.effort);
+        result = {
+          smallest: fallback.found ? fallback.bytes.length : outcome.smallest,
+          smallestBytes: fallback.found ? fallback.bytes : undefined,
+          smallestFormat: msg.format,
+        };
+        fallback.free();
+      }
+      outcome.free();
+      scope.postMessage({ type: 'done', result });
+    } finally {
+      source.free();
+    }
   } catch (err) {
     scope.postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });
   }

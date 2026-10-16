@@ -101,6 +101,7 @@ export function optimizeImage(
         type: 'start',
         format,
         limit: options.limit,
+        effort: options.effort,
         width: source.raster.width,
         height: source.raster.height,
         data: copy,

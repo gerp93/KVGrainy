@@ -6,3 +6,7 @@ target/
 
 # Stray pip wheels (installed from PyPI, never committed)
 *.whl
+
+# Playwright output
+web/test-results/
+web/playwright-report/

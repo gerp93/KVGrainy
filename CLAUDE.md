@@ -22,9 +22,13 @@ python gui.py
 python -m unittest discover -s tests -v
 python -m unittest tests.test_kvgrainy.KVGrainyTests.test_parse_size_limit   # single test
 
-# Rust engine (in progress, see PLAN.md; the Python code above is the reference engine)
+# Rust engine (see PLAN.md; the Python code above stays the shipped desktop app until Phase 5)
+# Windows native builds need NASM 2.16.x and Perl on PATH (docs/engine-spike.md).
 cargo test --workspace
-cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduced
+cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduced [--quick]
+
+# Web tool (static site; the search is the Rust core compiled to WASM, see docs/web.md)
+cd web && npm ci && npm test && npm run build && npm run budgets && npm run test:e2e
 
 # Compile-check after edits (fast syntax/import sanity check, no test runner needed)
 python -m py_compile gui.py kvgrainy.py updater.py theming.py
@@ -42,9 +46,11 @@ standalone commit — see that doc.
 
 ## Architecture
 
-> A Rust rewrite of the engine (`crates/kvgrainy-core`, `crates/kvgrainy-cli`) is
-> underway per [PLAN.md](PLAN.md); it handles still images only so far. The
-> Python engine below remains the shipped, reference implementation.
+> A Rust rewrite of the engine is underway per [PLAN.md](PLAN.md). `crates/kvgrainy-core`
+> (search, scoring, colour, codecs behind an `Encoder` trait) is shared by `crates/kvgrainy-cli`
+> and by the web tool, which compiles it to WebAssembly (`crates/kvgrainy-wasm`) and supplies
+> browser codecs; see [docs/web.md](docs/web.md). The core handles still images only. The
+> Python engine below remains the shipped desktop app and the reference for GIF and video.
 
 KVGrainy has two independent entry points sharing one optimization engine:
 

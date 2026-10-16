@@ -7,15 +7,18 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-default = ["native", "parallel"]
+default = ["native", "parallel", "extra-formats"]
 # The C-backed codec set (mozjpeg, libwebp, rav1e, libaom) behind `NativeEncoder`.
 # Turn off for targets that cannot build C code, such as wasm32; supply an `Encoder` instead.
 native = ["dep:mozjpeg", "dep:webp", "dep:ravif", "dep:avif-decode", "dep:imgref", "dep:rgb", "dep:imagequant", "dep:png", "dep:oxipng"]
+# Decode GIF, BMP and TIFF inputs. A browser build leaves these out (the browser decodes inputs
+# itself; Rust only decodes its own JPEG/WebP/PNG outputs), which saves about 80 KB gzipped of WASM.
+extra-formats = ["image/gif", "image/bmp", "image/tiff"]
 # Search formats on a rayon thread pool. Off, the search runs on the calling thread.
 parallel = ["dep:rayon"]
 
 [dependencies]
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 moxcms = "0.9"
 thiserror = "2"
 fast_image_resize = "5"

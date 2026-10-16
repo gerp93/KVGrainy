@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/kvgrainy-core", "crates/kvgrainy-cli", "crates/kvgrainy-wasm-spike"]
+members = ["crates/kvgrainy-core", "crates/kvgrainy-cli", "crates/kvgrainy-wasm-spike", "crates/kvgrainy-wasm"]
 resolver = "2"
 
 [workspace.package]
@@ -14,3 +14,12 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+
+# The browser build: size matters more than the last few percent of speed, and a panic can only abort anyway.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

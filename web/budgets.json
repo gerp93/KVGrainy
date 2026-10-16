@@ -1,0 +1,24 @@
+{
+  "comment": "Gzipped size limits in KB for everything `astro build` emits under dist/. The page loads only the first rule's files up front; codecs are fetched on demand per format. A new asset that matches no rule must stay under `default`. Raise a limit only with a reason in the PR.",
+  "initialLoad": { "label": "page, CSS and main script", "maxGzipKB": 32 },
+  "rules": [
+    { "match": "^kvgrainy_wasm_bg-.*[.]wasm$", "label": "Rust core", "maxGzipKB": 800 },
+    { "match": "^avif_enc(_mt)?-.*[.]wasm$", "label": "AVIF encoder", "maxGzipKB": 1200 },
+    { "match": "^avif_dec-.*[.]wasm$", "label": "AVIF decoder", "maxGzipKB": 370 },
+    { "match": "^webp_enc(_simd)?-.*[.]wasm$", "label": "WebP encoder", "maxGzipKB": 140 },
+    { "match": "^webp_dec-.*[.]wasm$", "label": "WebP decoder", "maxGzipKB": 60 },
+    { "match": "^mozjpeg_enc-.*[.]wasm$", "label": "JPEG encoder", "maxGzipKB": 70 },
+    { "match": "^mozjpeg_dec-.*[.]wasm$", "label": "JPEG decoder", "maxGzipKB": 75 },
+    { "match": "^squoosh_oxipng_bg-.*[.]wasm$", "label": "oxipng", "maxGzipKB": 120 },
+    { "match": "^squoosh_png_bg-.*[.]wasm$", "label": "PNG codec", "maxGzipKB": 100 },
+    { "match": "^squooshhqx_bg-.*[.]wasm$", "label": "HQX resize", "maxGzipKB": 30 },
+    { "match": "^squoosh_resize_bg-.*[.]wasm$", "label": "resize", "maxGzipKB": 25 },
+    { "match": "^jsquash_magic_kernel_bg-.*[.]wasm$", "label": "magic kernel resize", "maxGzipKB": 15 },
+    { "match": "^worker-.*[.]js$", "label": "stills worker", "maxGzipKB": 16 },
+    { "match": "^tuner-worker-.*[.]js$", "label": "tuner worker", "maxGzipKB": 10 },
+    { "match": "^index[.]astro_astro_type_script.*[.]js$", "label": "main page script", "maxGzipKB": 20 },
+    { "match": "[.]js$", "label": "other script", "maxGzipKB": 14 },
+    { "match": "[.]css$", "label": "stylesheet", "maxGzipKB": 8 }
+  ],
+  "default": { "label": "unlisted asset", "maxGzipKB": 60 }
+}
