@@ -87,8 +87,9 @@ Two separate changes, both leaving the chosen result untouched:
   fit. Measured with the real encoders at 6 to 24 MP: the strip total is within 1.1% of the whole for JPEG, WebP and lossless PNG,
   and 8.5% above it for AVIF (the check allows for that). Palette PNG, which is native-only, keeps encoding whole: per-strip palettes
   made its total 9.5% low and its quantizer twice as slow. Images up to 3 MP take exactly the old path. A/B against the previous
-  binary over 20 image and limit combinations (a real photo, an upscaled real photo, a 4K screenshot, RGBA, a 45 MP image, 100 KB to
-  8 MB limits): every output file was byte-identical, with equal or slightly better times.
+  binary over 20 image and limit combinations at Quick effort (a real photo, an upscaled real photo, a 4K screenshot, RGBA, a 45 MP
+  image, 100 KB to 8 MB limits): every output file was byte-identical, with equal or slightly better times. One Best-effort run
+  (AVIF included; 12 MP, 500 KB) was byte-identical too, 407 s against 386 s (about 5% slower) on this 4-core machine.
 - **One worker at a time** (`web/src/engine/parallelism.ts`). Each format worker holds about 550 MB at 12 MP whatever the format
   (scoring alone is about 240 MB), and they run in parallel, so the sum is the peak. For an image over 4 MP on a phone or a device
   reporting 4 GB or less, the workers now run one after another (a desktop runs two at a time above 16 MP). Same result, about twice the time.
