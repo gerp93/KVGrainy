@@ -6,7 +6,7 @@ Each tool produced its best output under a limit of 30% of the source file's
 size (highest quality that fits, found by bisection; KVGrainy runs its own
 search). Outputs are scored with SSIMULACRA2 against the upright sRGB original
 (higher is better; ~90 is visually lossless, negative is badly broken).
-Tools: KVGrainy (current Python engine), Pillow JPEG/WebP at scale 1.0,
+Tools: KVGrainy (the Python engine of the time, since deleted from the repo; see git history), Pillow JPEG/WebP at scale 1.0,
 `cwebp`, `avifenc` (libavif 1.0.4, speed 6), `pngquant`. `mozjpeg` and
 `oxipng` were not available in the test environment and are not yet included.
 

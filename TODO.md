@@ -18,7 +18,6 @@ and its `REPO_SCOPE.md` entry for that). Just what's not built yet. The plan the
 - Native GIF (gifski) and video (ffmpeg decode, MP4/WebM output by bitrate search) in the Rust core
   and desktop app (PLAN.md 4.2, 4.3). Today GIFs and clips run through the TypeScript search in the
   webview, which cannot decode `.mkv` or `.avi`.
-- Retire the Python app once the above is done (PLAN.md 5.6; the steps are in docs/release.md).
 - Tauri's updater plugin, once it can be built (docs/release.md explains the `zip` yank that blocks it).
 - Copy the result to the clipboard (web and desktop).
 - A macOS Intel build; arm64 only today.

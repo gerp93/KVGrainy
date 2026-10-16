@@ -1,8 +1,8 @@
 import { SCALE_FACTORS } from './search';
 
 /**
- * The manual "Fine-Tune GIF" logic, ported from `GifTuner` / `build_gif_ladder` in the desktop
- * engine (kvgrainy.py). Instead of searching for one optimum, it builds a fixed, ordered list of
+ * The manual "Fine-Tune GIF" logic, originally a Python `GifTuner` / `build_gif_ladder` (removed from
+ * the repo once this port shipped; see git history). Instead of searching for one optimum, it builds a fixed, ordered list of
  * configurations from best to worst across three independent axes (resolution, colours, frame
  * rate), degrading whichever axis the user picked first before touching the other two.
  */
@@ -45,7 +45,7 @@ export function buildGifLadder(priority: Priority): GifConfig[] {
   return ladder;
 }
 
-/** Python's round(): halves go to the even neighbour, so the slider lands on the same step as the desktop app. */
+/** Round halves to the even neighbour (banker's rounding, as Python's round() does), the rule the slider has always used, so existing step positions do not shift. */
 function roundHalfEven(x: number): number {
   const floor = Math.floor(x);
   const diff = x - floor;

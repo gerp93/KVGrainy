@@ -5,153 +5,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Setup
-python -m venv .venv
-.venv\Scripts\activate        # Windows; use `source .venv/bin/activate` on macOS/Linux
-pip install -r requirements.txt
-
-# Run the CLI
-python kvgrainy.py [paths ...] --limit 750kb --output ./reduced [--format jpeg|png|webp|gif]
-python kvgrainy.py                     # no args -> interactive prompt mode
-python kvgrainy.py clip.mp4 --limit 2mb --fps 12 [--start 1.5] [--end 6]  # video input -> optimized .gif
-
-# Run the desktop GUI
-python gui.py
-
-# Tests (stdlib unittest, no pytest dependency)
-python -m unittest discover -s tests -v
-python -m unittest tests.test_kvgrainy.KVGrainyTests.test_parse_size_limit   # single test
-
-# Rust engine (see PLAN.md; the Python code above stays the shipped desktop app until Phase 5)
-# Windows native builds need NASM 2.16.x and Perl on PATH (docs/engine-spike.md).
+# Rust engine and CLI (Windows native builds need NASM 2.16.x and Perl on PATH: docs/engine-spike.md)
 cargo test --workspace
-cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduced [--quick]
+cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduced [--quick] [--format jpeg|png|webp|avif]
 
 # Web tool (static site; the search is the Rust core compiled to WASM, see docs/web.md)
+# Needs: rustup target add wasm32-unknown-unknown; cargo install wasm-bindgen-cli --version <Cargo.lock's wasm-bindgen> --locked
 cd web && npm ci && npm test && npm run build && npm run budgets && npm run check-ads && npm run test:ads && npm run test:e2e
 
 # Desktop app (Tauri around the same UI, native core; Windows e2e; see docs/desktop.md)
 cd desktop && npm ci && npx tauri build --debug --no-bundle && npx playwright test
 
-# Compile-check after edits (fast syntax/import sanity check, no test runner needed)
-python -m py_compile gui.py kvgrainy.py updater.py theming.py
+# Release-manifest generator (stdlib unittest, no pytest dependency)
+python -m unittest discover -s tests -v
 ```
 
 There is no linter or formatter configured in this repo.
 
-`requirements.txt` installs `visual-assault-tkinter` directly from a GitHub
-subdirectory, pinned to a released tag (per
-[KVG_Standards/themes-versioning.md](https://github.com/gerp93/KVG_Standards/blob/main/themes-versioning.md) —
-never `@main`):
-`git+https://github.com/gerp93/VisualAssault.git@v0.2.0#subdirectory=packages/tkinter`.
-There is no PyPI package for it. Bumping the pinned version is a one-line,
-standalone commit — see that doc.
+The old Python app (`kvgrainy.py`, `gui.py`, Tkinter) was deleted on 2026-10-16; it is in git history if the
+reference behaviour is ever needed. The remaining Python is tooling only: `scripts/packaging.py` (release
+manifests, tested in `tests/`), `scripts/third_party.py`, `scripts/generate_icons.py` and `scripts/benchmark.py`.
 
 ## Architecture
 
-> A Rust rewrite of the engine is underway per [PLAN.md](PLAN.md). `crates/kvgrainy-core`
-> (search, scoring, colour, codecs behind an `Encoder` trait) is shared by `crates/kvgrainy-cli`
-> and by the web tool, which compiles it to WebAssembly (`crates/kvgrainy-wasm`) and supplies
-> browser codecs; see [docs/web.md](docs/web.md) (content, SEO and the ad rules: [docs/web-content.md](docs/web-content.md)).
-> The desktop app (`desktop/`, Tauri) hosts the same UI and calls the core natively; see
-> [docs/desktop.md](docs/desktop.md). Releases, signing secrets, the smoke test and package-manager manifests are in
-> [docs/release.md](docs/release.md). The core handles still images only. The
-> Python engine below remains the shipped desktop app and the reference for GIF and video.
+KVGrainy is one search engine with three front ends:
 
-KVGrainy has two independent entry points sharing one optimization engine:
+- **`crates/kvgrainy-core`**: the engine. For a size limit it searches `(format, scale, quality)` for the
+  best-scoring candidate that fits, scoring with SSIMULACRA2 on a 1 MP copy. Codecs sit behind an `Encoder`
+  trait; native builds use mozjpeg, libwebp, rav1e (AVIF), imagequant and oxipng, and the browser build
+  supplies WASM codecs from JavaScript. Stills only.
+- **`crates/kvgrainy-cli`**: the command line over the core.
+- **`crates/kvgrainy-wasm`**: the core compiled to WebAssembly for the web tool.
+- **`web/`**: the static site (Astro + TypeScript). One Web Worker per output format; the privacy claim is
+  enforced by `web/e2e/privacy.spec.ts`. GIFs and clips use a TypeScript search (`gif.ts`, `webpanim.ts`, and the
+  manual Fine-Tune GIF tuner in `tuner.ts`). See [docs/web.md](docs/web.md); content, SEO and the ad rules:
+  [docs/web-content.md](docs/web-content.md).
+- **`desktop/`**: Tauri 2 shell around the same UI, calling the core natively; GIFs use gifski. See
+  [docs/desktop.md](docs/desktop.md).
 
-- **`kvgrainy.py`** — the optimization engine and CLI. No dependency on Tkinter.
-- **`gui.py`** — a Tkinter desktop app (`KVGrainyGUI`) that imports and reuses
-  `kvgrainy.py`'s functions directly; it does not shell out to the CLI.
-- **`theming.py`** and **`updater.py`** — GUI-only concerns, imported by `gui.py`.
-
-### Optimization engine (`kvgrainy.py`)
-
-The core idea used throughout: for a target size limit, search a space of
-`(format, scale, quality/colors)` combinations and keep the best-scoring
-candidate that still fits under the limit. A `Candidate` bundles the encoded
-bytes with a `total_score` (weighted blend of `VISUAL_WEIGHT` similarity vs.
-`SIZE_UTILIZATION_WEIGHT` — how much of the size budget got used), and
-`is_better()` picks the winner by `(total_score, size_bytes)`.
-
-Two parallel search paths exist because static and animated images need
-different knobs:
-
-- **Static images** (`optimize_image` → `find_best_for_format` →
-  `evaluate_candidate`): tries JPEG/WEBP/PNG (or a single forced format via
-  `--format`) across `SCALE_FACTORS`, binary-searching JPEG/WEBP quality
-  (20–100) at each scale; PNG/GIF have no quality knob so every scale is
-  just evaluated once. `rms_score()` measures visual similarity by
-  re-decoding the candidate and diffing pixels against the original.
-- **Animated GIFs and video** (`optimize_image` → `optimize_frames` →
-  `find_best_gif`): any file with a video extension (`VIDEO_EXTENSIONS`:
-  `.mp4`/`.mov`/`.m4v`/`.avi`/`.mkv`) or any `.is_animated` PIL image hits
-  this path — the two source types are unified into the same
-  `(frames, durations, loop)` triple before the search even starts, via two
-  interchangeable loaders: `load_gif_frames()` decodes an already-open
-  animated `Image`, `load_video_frames()` decodes a video with `imageio`'s
-  ffmpeg reader, sampling down to `DEFAULT_VIDEO_FPS` (or `--fps`) and
-  optionally clipped by `--start`/`--end`. From there it's one search: same
-  scale loop as static images, but binary-searches per-frame palette size
-  (2–256 colors) at each scale instead of quality, sampling up to 5 frames
-  for the visual score since scoring every frame would be too slow. This
-  path always outputs `.gif`, whether the source was a GIF or a video; it
-  never falls back to another format. Video-specific resizing/FPS knobs are
-  deliberately *not* duplicated here — `SCALE_FACTORS` and the frame-drop
-  ladder below already own those axes, so a decoded video is just another
-  frame source feeding the one GIF-fitting engine.
-
-A third, separate mechanism — `build_gif_ladder()` / `GifTuner` — powers the
-GUI's manual "Fine-Tune GIF" tab and is not used by the automatic bulk-mode
-paths above. `GifTuner` also accepts either a GIF or a video path (same
-loader dispatch as `optimize_image`). Instead of searching for one optimum,
-it builds a fixed, ordered list of configs (best → worst) across three
-independent axes — scale, color count, and frame-drop step
-(`apply_frame_step`, which keeps every Nth frame and sums the dropped
-frames' durations into the kept frame's, so playback speed doesn't change)
-— degrading whichever axis the user picked as `priority` first, before
-touching the other two. `GifTuner` caches encodes by `(priority, ladder
-index)` so scrubbing a slider in the GUI doesn't re-encode configs it's
-already computed. `max_feasible_index()` finds the best (lowest-index)
-config that still fits a size limit; the GUI maps its quality slider's 100%
-end to that index rather than to ladder index 0, so the slider always spans
-a fully-usable range regardless of how strict the limit is.
-
-### GUI (`gui.py`)
-
-`KVGrainyGUI` builds a `ttk.Notebook` with two tabs, `setup_bulk_tab` (drives
-`kvgrainy.optimize_image` directly, one call per file — `SUPPORTED_EXTENSIONS`
-covers both images and video, so the same file picker and batch loop handle
-both without a separate code path) and `setup_finetune_tab` (drives
-`GifTuner` for one GIF or video at a time, live-previewing the animated
-result as the user adjusts limit/priority/quality). Every encode — bulk or
-fine-tune — runs on a background `Thread` and posts results back via
-`self.root.after(0, ...)`, since Tk is not thread-safe and must only be
-touched from the main thread.
-
-**`theming.py`** applies color themes from the separate
-[VisualAssault](https://github.com/gerp93/VisualAssault) project. It forces
-`ttk.Style` to the `clam` base theme (the only one that reliably honors
-custom background/foreground overrides cross-platform) and manually restyles
-raw `tk.Text`/`tk.Menu` widgets, since ttk styling doesn't reach them.
-`capture_defaults()` must be called once, after the full UI (including all
-menus) is built, so picking "System Default" can restore the exact native
-look rather than guessing at it.
-
-**`updater.py`** implements in-app self-update: it compares a build-time
-`_version.py` (generated by CI, gitignored, absent when running from source —
-`CURRENT_VERSION` falls back to `"0.0.0-dev"` and every update check no-ops
-in that case) against the latest GitHub release, then downloads and
-self-replaces. The replace step is platform-specific and easy to get wrong:
-on Windows the running `.exe` can't overwrite itself, so it writes a
-self-deleting batch script that polls `tasklist` for the current PID to
-disappear before copying the new exe over and relaunching; on macOS/Linux it
-replaces the running binary directly and `os.execv`s into it, since POSIX
-allows replacing a file that's currently executing. On the Windows path,
-terminating with `sys.exit()` does **not** work if called from a Tkinter
-callback (`root.after`) — Tkinter's callback exception handler silently
-swallows the resulting `SystemExit`, so the process never actually dies and
-the batch script's wait loop spins forever. Use `os._exit()` there instead.
+Project plan and status: [PLAN.md](PLAN.md). Open work: [TODO.md](TODO.md). Launch checklist: [docs/launch.md](docs/launch.md).
 
 ### Release pipeline (`.github/workflows/auto-release.yml` + `cut-release.yml`)
 
@@ -162,12 +54,10 @@ available in the Actions tab for a deliberately-numbered release
 (`workflow_dispatch`, explicit `vX.Y.Z` input) when you want one instead of
 the auto-bump. Both call the local `release-desktop.yml`, which creates the
 GitHub Release and attaches the Tauri installers (see `docs/release.md`).
-**The Python app is no longer packaged in releases** (the PyInstaller
-`release-python-gui.yml` job was dropped); its source stays here as the
-reference engine, and `updater.py` has no new release assets to find. To force a
-release with no other code change, edit `VERSION_BUMP.md` instead of
-pushing an empty commit — `auto-release.yml` bumps on every push
-regardless of content.
+Pushes that only touch docs, any `*.md`, tests, e2e specs or `*-ci.yml` workflows do not release
+(`paths:` filter, PLAN.md 5.4); UI changes do, because the desktop app embeds the web UI. To force a release with
+no other code change, edit `VERSION_BUMP.md` instead of pushing an empty commit. The old Python app is no longer
+built or released (and its source is deleted).
 
 ## Standards
 

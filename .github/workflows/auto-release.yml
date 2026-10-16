@@ -23,11 +23,6 @@ on:
       - '!tests/**'
       - '!web/src/content/**'
       - '!.github/workflows/*-ci.yml'
-      - '!gui.py'
-      - '!kvgrainy.py'
-      - '!theming.py'
-      - '!updater.py'
-      - '!requirements.txt'
 
 permissions:
   contents: write

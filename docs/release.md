@@ -11,9 +11,9 @@ Every push to `main` that changes the product tags a new patch version and runs
    to the release. Then it renders Scoop, winget and Homebrew manifests from the uploaded files and
    attaches those too.
 
-The Python app is no longer built or released. Its source is still in the repo (see below), and
-changes to it alone do not cut a release. Copies of the Python app already installed will not find
-newer releases, because those no longer carry its files.
+The old Python app is gone: it is no longer built or released, and its source was deleted from the repo (it
+remains in git history; see the last section). Copies already installed will not find newer releases, because
+releases no longer carry its files.
 
 `cut-release.yml` does the same for a version you choose (Actions tab, "Run workflow").
 
@@ -99,13 +99,14 @@ exact installers and the workflow attaches them to each release:
 
 None of this was published or installed from here.
 
-## Retiring the Python app (PLAN.md 5.6): packaging stopped, code not deleted
+## The Python app (PLAN.md 5.6): deleted
 
-Releases no longer package the Python app (`gui.py`, `kvgrainy.py`, `theming.py`, `updater.py`), but
-its source stays in the repo as the reference engine. Deleting it would regress video: PLAN.md 4.3
-(native video) is not done, so the Tauri app runs clips through the webview's TypeScript search,
-which covers the common cases but not `.mkv` and `.avi` (WebView2 cannot decode them) and is slower. When those are native, delete the Python files and
-`requirements.txt`, and update the README and CLAUDE.md.
+`gui.py`, `kvgrainy.py`, `theming.py`, `updater.py`, `requirements.txt` and its tests were removed on 2026-10-16
+(owner's decision); recover them from git history if needed. They had not been packaged in releases for some time,
+so no shipped capability was lost. What the Python code did that nothing else does yet: decode `.mkv` and `.avi`
+(via imageio-ffmpeg) and run clips through a native search. The Tauri app sends clips through the webview's
+TypeScript search, which covers the common cases but not those two containers (WebView2 cannot decode them) and is
+slower. Native video (PLAN.md 4.3) is the way to close that gap.
 
 ## Verifying a release
 
