@@ -242,8 +242,13 @@ function createCard(file: File, settings: Settings) {
   /** Decode the file once: a video or animated image becomes frames, anything else a still. */
   async function load(): Promise<Loaded> {
     if (isVideo) return loadVideoFrames(file, setNote);
-    const animation = await loadAnimatedImage(file, setNote);
-    return animation ?? { kind: 'still', source: await loadSource(file) };
+    // The desktop app fits animated GIF, WebP and PNG natively (as a GIF), so it skips decoding frames here.
+    // Choosing WebP output still takes the TypeScript path, which can write an animated WebP.
+    if (!shell.nativeAnimation || settings.format === 'webp') {
+      const animation = await loadAnimatedImage(file, setNote);
+      if (animation) return animation;
+    }
+    return { kind: 'still', source: await loadSource(file) };
   }
 
   /** Animations can come out as GIF (the default) or animated WebP. Nothing else here can animate. */

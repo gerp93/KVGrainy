@@ -85,6 +85,7 @@ async function toFile(path: string): Promise<File> {
 }
 
 export const shell: Shell = {
+  nativeAnimation: true,
   onOpenFiles(callback) {
     const open = async (paths: string[]) => {
       try {

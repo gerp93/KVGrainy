@@ -1,4 +1,5 @@
 import { deflateSync } from 'node:zlib';
+import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -62,4 +63,27 @@ export function flatPng(width: number, height: number): Buffer {
     chunk('IDAT', deflateSync(raw)),
     chunk('IEND', new Uint8Array()),
   ]);
+}
+
+/** A looping GIF with real motion: a yellow disc sweeping over a gradient, in colour. */
+export function animatedGif(width: number, height: number, frames: number): Buffer {
+  const encoder = GIFEncoder();
+  for (let f = 0; f < frames; f++) {
+    const rgba = new Uint8Array(width * height * 4);
+    const cx = ((f + 0.5) / frames) * width;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const inDisc = (x - cx) ** 2 + (y - height / 2) ** 2 < (height / 4) ** 2;
+        rgba[i] = inDisc ? 250 : 40 + (x * 150) / width;
+        rgba[i + 1] = inDisc ? 220 : 60 + (y * 140) / height;
+        rgba[i + 2] = inDisc ? 60 : 120 + f * 3;
+        rgba[i + 3] = 255;
+      }
+    }
+    const palette = quantize(rgba, 128);
+    encoder.writeFrame(applyPalette(rgba, palette), width, height, { palette, delay: 80 });
+  }
+  encoder.finish();
+  return Buffer.from(encoder.bytes());
 }

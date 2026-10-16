@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Source } from './engine';
 import type { OptimizeOptions } from './engine';
-import type { Format, OptimizeResult } from './types';
+import type { OptimizeResult, OutputFormat } from './types';
 
 /**
  * The desktop build's stills engine: the same Rust core as the web build, run natively (mozjpeg,
@@ -24,8 +24,8 @@ export async function loadSource(file: Blob): Promise<Source> {
 }
 
 interface Meta {
-  outcome: 'ok' | 'nothing-fits' | 'cancelled';
-  format?: Format;
+  outcome: 'ok' | 'nothing-fits' | 'cancelled' | 'not-animated';
+  format?: OutputFormat;
   quality?: number;
   scale: number;
   score: number;
@@ -50,6 +50,8 @@ export async function optimizeImage(
   if (!source.file) throw new Error('The desktop engine needs the original file.');
   const id = crypto.randomUUID();
   const body = await source.file.arrayBuffer();
+  const name = (source.file as File).name ?? '';
+  const mayAnimate = ['image/gif', 'image/webp', 'image/png'].includes(source.file.type) || /\.(gif|webp|png)$/i.test(name);
 
   const unlisten = await listen<{ id: string; fraction: number }>('optimize-progress', (event) => {
     if (event.payload.id === id) onProgress(Math.min(1, event.payload.fraction));
@@ -57,10 +59,12 @@ export async function optimizeImage(
   const cancel = () => void invoke('cancel_optimize', { id });
   signal.addEventListener('abort', cancel, { once: true });
   try {
-    const reply = await invoke<ArrayBuffer>('optimize_image', body, {
-      headers: { 'x-job-id': id, 'x-limit': String(options.limit), 'x-format': options.format ?? '', 'x-effort': options.effort },
-    });
-    const { meta, bytes } = parseReply(reply);
+    const headers = { 'x-job-id': id, 'x-limit': String(options.limit), 'x-format': options.format ?? '', 'x-effort': options.effort };
+    // An animated GIF, WebP or PNG is fitted as a GIF by the native animation search; a still reports
+    // "not-animated" after a header read and goes on to the still search.
+    let parsed = mayAnimate ? parseReply(await invoke<ArrayBuffer>('optimize_animation', body, { headers })) : undefined;
+    if (!parsed || parsed.meta.outcome === 'not-animated') parsed = parseReply(await invoke<ArrayBuffer>('optimize_image', body, { headers }));
+    const { meta, bytes } = parsed;
     if (meta.outcome === 'cancelled') throw new DOMException('Cancelled', 'AbortError');
     onProgress(1);
     if (meta.outcome === 'ok' && meta.format) {

@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use kvgrainy_core::animated::{best_effort_gif, load_animation, optimize_gif, AnimationError, GifOptions};
 use kvgrainy_core::load::decode;
 use kvgrainy_core::{best_effort, optimize, Effort, Error, Format, Options, Progress};
 use serde::Serialize;
@@ -45,7 +46,8 @@ struct ProgressEvent {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Meta {
-    /// "ok", "nothing-fits" (bytes are the smallest output possible, over the limit) or "cancelled".
+    /// "ok", "nothing-fits" (bytes are the smallest output possible, over the limit), "cancelled", or
+    /// (animation command only) "not-animated": the file is a still and the caller should use `optimize_image`.
     outcome: &'static str,
     format: Option<&'static str>,
     quality: Option<u8>,
@@ -141,6 +143,71 @@ fn run_search(search: Search, bytes: &[u8]) -> Result<Response, String> {
                 None => reply(&Meta { smallest, ..base("nothing-fits") }, &[]),
             }
         }
+    }
+}
+
+/// Fit an animated GIF, WebP or PNG under a size limit as a GIF, with gifski. Same parameters and
+/// reply as `optimize_image`; a file that turns out to be a still comes back as outcome "not-animated"
+/// (after at most a header read) so the caller can send it to `optimize_image` instead.
+#[tauri::command]
+async fn optimize_animation(app: AppHandle, jobs: State<'_, Jobs>, request: Request<'_>) -> Result<Response, String> {
+    let bytes = raw_body(&request)?.to_vec();
+    let id = header(&request, "x-job-id");
+    let limit: u64 = header(&request, "x-limit").parse().map_err(|_| "x-limit must be a number of bytes".to_string())?;
+    let cancel = Arc::new(AtomicBool::new(false));
+    jobs.0.lock().map_err(|_| "job list poisoned")?.insert(id.clone(), cancel.clone());
+    let search = Search { app, id: id.clone(), limit, format: None, effort: Effort::Quick, cancel };
+    let result = tauri::async_runtime::spawn_blocking(move || run_animation(search, &bytes)).await;
+    jobs.0.lock().map_err(|_| "job list poisoned")?.remove(&id);
+    result.map_err(|e| e.to_string())?
+}
+
+fn run_animation(search: Search, bytes: &[u8]) -> Result<Response, String> {
+    let blank = |outcome| Meta {
+        outcome,
+        format: None,
+        quality: None,
+        scale: 0.0,
+        score: 0.0,
+        limit: search.limit,
+        smallest: 0,
+        width: 0,
+        height: 0,
+        warnings: Vec::new(),
+    };
+    let animation = match load_animation(bytes) {
+        Ok(animation) => animation,
+        Err(AnimationError::NotAnimated) => return reply(&blank("not-animated"), &[]),
+        Err(why) => return Err(why.to_string()),
+    };
+    let (width, height) = (animation.width, animation.height);
+    let options = GifOptions { limit_bytes: search.limit, cancel: Some(search.cancel.clone()) };
+    let progress = |fraction: f64| {
+        let _ = search.app.emit("optimize-progress", ProgressEvent { id: search.id.clone(), fraction });
+    };
+    match optimize_gif(&animation, &options, &progress) {
+        Ok(best) => {
+            let meta = Meta {
+                format: Some("gif"),
+                quality: Some(best.settings.quality),
+                scale: best.settings.scale,
+                score: best.score,
+                smallest: best.bytes.len() as u64,
+                width,
+                height,
+                ..blank("ok")
+            };
+            reply(&meta, &best.bytes)
+        }
+        Err(AnimationError::Cancelled) => reply(&blank("cancelled"), &[]),
+        Err(AnimationError::NothingFits { smallest, .. }) => match best_effort_gif(&animation) {
+            Ok(fallback) => {
+                let meta = Meta { format: Some("gif"), smallest, width, height, ..blank("nothing-fits") };
+                reply(&meta, &fallback.bytes)
+            }
+            Err(_) => reply(&Meta { smallest, ..blank("nothing-fits") }, &[]),
+        },
+        Err(why) => Err(why.to_string()),
     }
 }
 
@@ -277,6 +344,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             optimize_image,
+            optimize_animation,
             cancel_optimize,
             save_file,
             reveal_in_folder,
