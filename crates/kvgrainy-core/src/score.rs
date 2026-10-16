@@ -1,10 +1,10 @@
 //! Perceptual scoring of an encoded candidate against the original.
 //!
-//! Two scores, both measured on a copy of the original capped at [`SCORE_CAP_PIXELS`]
-//! (docs/metric-study.md): SSIMULACRA2 (the verdict, ~280 ms per score at the cap) and a
-//! luma-SSIM proxy (about 20x cheaper) that the search uses to rank candidates within one
-//! format. Capping bounds memory and time regardless of source size: a 12 MP photo needs
-//! about 240 MB to score in WASM instead of about 2 GB.
+//! Scores are measured on a copy of the original capped at [`SCORE_CAP_PIXELS`]
+//! (docs/metric-study.md): SSIMULACRA2 (what the search ranks by, ~280 ms per score at the
+//! cap) and a luma-SSIM proxy (about 20x cheaper) that is validated for JPEG photos only and
+//! not used by the search. Capping bounds memory and time regardless of source size: a 12 MP
+//! photo needs about 240 MB to score in WASM instead of about 2 GB.
 
 use std::borrow::Cow;
 
@@ -92,9 +92,9 @@ impl Reference {
         pixel_similarity(&self.flat, &distorted)
     }
 
-    /// Cheap luma-SSIM similarity in `0.0..=1.0`, for ranking candidates of one format.
-    /// It orders candidates like [`Reference::score_with`] (see docs/metric-study.md) but its
-    /// values are not on the same scale; never compare the two.
+    /// Cheap luma-SSIM similarity in `0.0..=1.0`. On JPEG photos it orders candidates like
+    /// [`Reference::score_with`] (docs/metric-study.md) but it cannot see colour damage such as
+    /// palette banding, and its values are not on the same scale; never compare the two.
     pub fn proxy_with(&self, encoder: &dyn Encoder, payload: &[u8], format: Format) -> f64 {
         match encoder.decode(format, payload) {
             Some(decoded) => self.proxy_raster(&decoded),

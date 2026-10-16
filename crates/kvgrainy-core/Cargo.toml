@@ -10,7 +10,7 @@ repository.workspace = true
 default = ["native", "parallel"]
 # The C-backed codec set (mozjpeg, libwebp, rav1e, libaom) behind `NativeEncoder`.
 # Turn off for targets that cannot build C code, such as wasm32; supply an `Encoder` instead.
-native = ["dep:mozjpeg", "dep:webp", "dep:ravif", "dep:avif-decode", "dep:imgref", "dep:rgb"]
+native = ["dep:mozjpeg", "dep:webp", "dep:ravif", "dep:avif-decode", "dep:imgref", "dep:rgb", "dep:imagequant", "dep:png", "dep:oxipng"]
 # Search formats on a rayon thread pool. Off, the search runs on the calling thread.
 parallel = ["dep:rayon"]
 
@@ -28,3 +28,6 @@ avif-decode = { version = "1.0.2", default-features = false, optional = true }
 imgref = { version = "1", optional = true }
 rgb = { version = "0.8", optional = true }
 rayon = { version = "1", optional = true }
+imagequant = { version = "4.4.1", default-features = false, optional = true }
+png = { version = "0.18.1", optional = true }
+oxipng = { version = "10", default-features = false, optional = true }

@@ -195,7 +195,7 @@ fn impossible_limit_still_yields_a_best_effort_file() {
     let decoded = kvgrainy_core::NativeEncoder.decode(best.format, &best.bytes).expect("decodable");
     assert!(decoded.width > 0 && decoded.height > 0);
     // It is the smallest on offer: no candidate format at that scale and quality is smaller.
-    for format in [Format::Jpeg, Format::Webp, Format::Avif, Format::Png] {
+    for format in [Format::Jpeg, Format::Webp, Format::Avif, Format::Png, Format::PngPalette] {
         let q = if format.has_quality() { 20 } else { 100 };
         let other = encode(format, &image.scaled(0.3), q).unwrap();
         assert!(best.bytes.len() <= other.len(), "{format:?} was smaller ({} < {})", other.len(), best.bytes.len());
@@ -219,4 +219,70 @@ fn quick_effort_never_picks_avif() {
     let options = Options { effort: kvgrainy_core::Effort::Quick, ..Options::new(8 * 1024) };
     let best = optimize(&noise(120, 90), &options, &no_progress).unwrap();
     assert_ne!(best.format, Format::Avif);
+}
+
+/// Wrap `profile` into JPEG APP2 ICC_PROFILE segment(s) right after the SOI marker.
+fn with_icc(jpeg: &[u8], profile: &[u8]) -> Vec<u8> {
+    let chunks: Vec<&[u8]> = profile.chunks(60_000).collect();
+    let mut out = jpeg[..2].to_vec();
+    for (i, chunk) in chunks.iter().enumerate() {
+        let mut payload = b"ICC_PROFILE\0".to_vec();
+        payload.extend([(i + 1) as u8, chunks.len() as u8]);
+        payload.extend(*chunk);
+        out.extend([0xFF, 0xE2]);
+        out.extend(((payload.len() + 2) as u16).to_be_bytes());
+        out.extend(payload);
+    }
+    out.extend(&jpeg[2..]);
+    out
+}
+
+fn solid(width: u32, height: u32, rgb: [u8; 3]) -> Raster {
+    Raster { width, height, rgb: rgb.repeat((width * height) as usize), alpha: None }
+}
+
+#[test]
+fn wide_gamut_source_is_converted_to_srgb() {
+    use moxcms::ColorProfile;
+    // A saturated colour in Display P3 lies outside sRGB; the same numbers read as sRGB are visibly duller.
+    let jpeg = encode(Format::Jpeg, &solid(32, 32, [230, 60, 50]), 98).unwrap();
+    let p3 = ColorProfile::new_display_p3().encode().expect("encode P3 profile");
+
+    let untagged = decode(&jpeg).unwrap().raster;
+    let tagged = decode(&with_icc(&jpeg, &p3)).unwrap();
+    assert!(tagged.warnings.is_empty(), "a valid profile must not warn: {:?}", tagged.warnings);
+    let (a, b) = (&untagged.rgb[0..3], &tagged.raster.rgb[0..3]);
+    let difference: i32 = a.iter().zip(b).map(|(&x, &y)| (x as i32 - y as i32).abs()).sum();
+    assert!(difference > 12, "P3 pixels were not converted: untagged {a:?}, tagged {b:?}");
+    // P3 red is more saturated than sRGB red: converting to sRGB pushes the red channel up and green/blue down.
+    assert!(b[0] >= a[0] && b[1] <= a[1] && b[2] <= a[2], "unexpected direction: {a:?} -> {b:?}");
+}
+
+#[test]
+fn srgb_tagged_source_is_left_alone() {
+    use moxcms::ColorProfile;
+    let jpeg = encode(Format::Jpeg, &solid(32, 32, [90, 140, 200]), 98).unwrap();
+    let srgb = ColorProfile::new_srgb().encode().expect("encode sRGB profile");
+    let untagged = decode(&jpeg).unwrap().raster;
+    let tagged = decode(&with_icc(&jpeg, &srgb)).unwrap().raster;
+    let worst = untagged.rgb.iter().zip(&tagged.rgb).map(|(&x, &y)| (x as i32 - y as i32).abs()).max().unwrap();
+    assert!(worst <= 2, "an sRGB profile changed pixels by {worst}");
+}
+
+#[test]
+fn cmyk_jpeg_decodes_with_plausible_colours() {
+    // Adobe-style CMYK JPEGs store inverted ink values: 255 means no ink. Cyan ink only is (0, 255, 255, 255).
+    let (w, h) = (16usize, 16usize);
+    let pixels: Vec<u8> = [0u8, 255, 255, 255].repeat(w * h);
+    let mut compress = mozjpeg::Compress::new(mozjpeg::ColorSpace::JCS_CMYK);
+    compress.set_size(w, h);
+    compress.set_quality(95.0);
+    let mut started = compress.start_compress(Vec::new()).unwrap();
+    started.write_scanlines(&pixels).unwrap();
+    let jpeg = started.finish().unwrap();
+
+    let raster = decode(&jpeg).expect("CMYK JPEG must decode").raster;
+    assert_eq!((raster.width, raster.height), (16, 16));
+    let px = &raster.rgb[0..3];
+    assert!(px[0] < 90 && px[1] > 140 && px[2] > 140, "cyan ink should look cyan, got {px:?}");
 }

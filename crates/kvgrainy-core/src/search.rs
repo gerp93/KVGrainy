@@ -64,9 +64,11 @@ pub enum Error {
 /// The formats [`optimize_with`] would try for `source` under `options`.
 fn candidate_formats(source: &Raster, options: &Options) -> Vec<Format> {
     let mut formats = match options.format {
+        // A forced PNG still lets the search choose between lossless and palette.
+        Some(Format::Png | Format::PngPalette) => vec![Format::Png, Format::PngPalette],
         Some(f) => vec![f],
-        None if source.alpha.is_some() => vec![Format::Webp, Format::Avif, Format::Png],
-        None => vec![Format::Jpeg, Format::Webp, Format::Avif, Format::Png],
+        None if source.alpha.is_some() => vec![Format::Webp, Format::Avif, Format::Png, Format::PngPalette],
+        None => vec![Format::Jpeg, Format::Webp, Format::Avif, Format::Png, Format::PngPalette],
     };
     if options.effort == Effort::Quick && options.format.is_none() {
         formats.retain(|&f| f != Format::Avif);
@@ -114,28 +116,16 @@ pub fn optimize_with(
         return Err(Error::Cancelled);
     }
     let smallest = results.iter().map(|r| r.smallest).min().unwrap_or(u64::MAX);
-    // Within a format the walk ranked candidates with the cheap proxy. Formats are
-    // compared, and the answer reported, with SSIMULACRA2, so verify each format's
-    // best now: at most one expensive score per format rather than one per candidate.
-    let mut bests: Vec<Candidate> = results.into_iter().filter_map(|r| r.best).collect();
-    let verify = |c: &mut Candidate| {
-        if !cancelled() {
-            c.score = reference.score_with(encoder, &c.bytes, c.format);
-        }
-    };
-    #[cfg(feature = "parallel")]
-    bests.par_iter_mut().for_each(verify);
-    #[cfg(not(feature = "parallel"))]
-    bests.iter_mut().for_each(verify);
-    if cancelled() {
-        return Err(Error::Cancelled);
-    }
+    let bests: Vec<Candidate> = results.into_iter().filter_map(|r| r.best).collect();
     bests
         .into_iter()
         .max_by_key(|c| {
             // Scores within 0.1 SSIMULACRA2 points are a tie, so noise can't pick a
-            // needlessly smaller image; ties go to the higher scale, then the larger file.
-            ((c.score * 1000.0).round() as i64, (c.scale * 100.0).round() as i32, c.bytes.len())
+            // needlessly smaller image; ties go to the higher scale, then the larger file
+            // (closer to the budget). A visually lossless tie goes to the smaller file instead.
+            let lossless = c.score >= VISUALLY_LOSSLESS;
+            let size = c.bytes.len() as i64;
+            ((c.score * 1000.0).round() as i64, (c.scale * 100.0).round() as i32, if lossless { -size } else { size })
         })
         .ok_or(Error::NothingFits { limit: options.limit_bytes, smallest })
 }
@@ -174,14 +164,19 @@ const GOOD_ENOUGH_QUALITY: u8 = 100;
 /// Stop walking down the scale ladder after this many scales in a row fail to improve the score.
 const PATIENCE: usize = 2;
 const MIN_QUALITY: u8 = 20;
+/// A score at or above this is indistinguishable from the original.
+const VISUALLY_LOSSLESS: f64 = 0.999;
 /// Quality values encoded together in each round of the quality search. Fixed per build so
 /// results never depend on the machine; one when the search runs on a single thread.
 #[cfg(feature = "parallel")]
 const PROBES_PER_ROUND: usize = 3;
 #[cfg(not(feature = "parallel"))]
 const PROBES_PER_ROUND: usize = 1;
-/// A lossless candidate is skipped when `full_size_bytes * scale^2 * this` still exceeds the limit.
-const LOSSLESS_SKIP_SLACK: f64 = 0.5;
+/// Unless PNG was forced, a PNG family is dropped when its smallest full-size encode exceeds the
+/// limit by more than this factor.
+const PNG_HOPELESS_RATIO: f64 = 1.5;
+/// A scale is skipped when the smallest full-size encode, scaled by `scale^2` and this, still exceeds the limit.
+const SKIP_SLACK: f64 = 0.5;
 
 /// Walk the scale ladder for one format from large to small, stopping once more
 /// shrinking can't help. Cheap relative to trying every scale: a fit at high
@@ -201,14 +196,14 @@ fn search_format(
     let mut misses = 0;
     let mut min_quality = MIN_QUALITY;
     let mut index = 0;
-    let mut lossless_full_len: Option<u64> = None;
+    let mut floor_len_full: Option<u64> = None;
 
     while index < SCALE_FACTORS.len() && !cancelled() {
         let scale = SCALE_FACTORS[index];
-        // A lossless output shrinks roughly with pixel count. Once the full-size encode is far
-        // too big for this scale's pixel count (with 2x slack), skip the encode: it can't fit.
-        if let Some(full) = lossless_full_len {
-            if full as f64 * (scale as f64).powi(2) * LOSSLESS_SKIP_SLACK > options.limit_bytes as f64 {
+        // Output size shrinks roughly with pixel count. Once the smallest full-size encode is
+        // far too big for this scale's pixel count (with 2x slack), skip the encode: it can't fit.
+        if let Some(full) = floor_len_full {
+            if full as f64 * (scale as f64).powi(2) * SKIP_SLACK > options.limit_bytes as f64 {
                 report(1);
                 index += 1;
                 continue;
@@ -225,14 +220,23 @@ fn search_format(
                     .flatten()
             });
 
-        if index == 0 && !format.has_quality() {
-            lossless_full_len = Some(smallest);
+        if index == 0 {
+            floor_len_full = Some(smallest);
+        }
+        if index == 0 && matches!(format, Format::Png | Format::PngPalette) {
+            // A PNG family whose smallest full-size output is several times the limit would
+            // need a drastic downscale to fit, and then loses to a lossy format at a higher
+            // scale (typical of photos). Skip it unless the caller asked for PNG.
+            if options.format.is_none() && smallest as f64 > options.limit_bytes as f64 * PNG_HOPELESS_RATIO {
+                report(SCALE_FACTORS.len());
+                return TaskResult { best, smallest };
+            }
         }
         let mut next = index + 1;
         match attempt {
             Some((bytes, quality)) if !cancelled() => {
                 min_quality = quality;
-                let score = reference.proxy_with(encoder, &bytes, format);
+                let score = reference.score_with(encoder, &bytes, format);
                 let improved = best.as_ref().is_none_or(|b| score > b.score + 0.001);
                 if improved {
                     best = Some(Candidate { bytes, format, quality: format.has_quality().then_some(quality), scale, score });
@@ -298,12 +302,16 @@ fn fit_at_scale(
         return None;
     }
     let (mut lo, mut hi) = (min_quality.saturating_add(1), 100u8);
+    // The nearest known fit and miss, as (quality, bytes): they steer where to probe next.
+    let mut known_fit = fit.as_ref().map(|(bytes, q)| (*q, bytes.len() as u64));
+    let mut known_miss = if known_fit.is_none() { Some((min_quality, last_len.get())) } else { None };
     while lo <= hi && !cancelled() {
-        let probes = probe_qualities(lo, hi, PROBES_PER_ROUND);
+        let centre = guess_quality(limit, known_fit, known_miss, lo, hi);
+        let probes = probe_qualities(centre, lo, hi, PROBES_PER_ROUND);
         let outcomes: Vec<(u8, Result<Vec<u8>, String>)> = encode_probes(encoder, resized, format, &probes);
         // Highest quality that fit, and the lowest one above it that did not.
         let mut best_fit: Option<(u8, Vec<u8>)> = None;
-        let mut lowest_miss: Option<u8> = None;
+        let mut lowest_miss: Option<(u8, u64)> = None;
         for (quality, outcome) in outcomes {
             let Ok(bytes) = outcome else { continue };
             *smallest = (*smallest).min(bytes.len() as u64);
@@ -311,19 +319,24 @@ fn fit_at_scale(
                 if best_fit.as_ref().is_none_or(|(q, _)| quality > *q) {
                     best_fit = Some((quality, bytes));
                 }
-            } else if lowest_miss.is_none_or(|q| quality < q) {
-                lowest_miss = Some(quality);
+            } else if lowest_miss.is_none_or(|(q, _)| quality < q) {
+                lowest_miss = Some((quality, bytes.len() as u64));
             }
         }
         match best_fit {
             Some((quality, bytes)) => {
                 lo = quality.saturating_add(1);
+                known_fit = Some((quality, bytes.len() as u64));
                 fit = Some((bytes, quality));
-                if let Some(miss) = lowest_miss.filter(|&m| m > quality) {
+                if let Some((miss, len)) = lowest_miss.filter(|&(m, _)| m > quality) {
                     hi = miss - 1;
+                    known_miss = Some((miss, len));
                 }
             }
-            None => hi = lowest_miss.map_or(lo.saturating_sub(1), |m| m - 1),
+            None => {
+                hi = lowest_miss.map_or(lo.saturating_sub(1), |(m, _)| m - 1);
+                known_miss = lowest_miss;
+            }
         }
         if lo == 0 || hi == 0 {
             break;
@@ -332,14 +345,34 @@ fn fit_at_scale(
     fit
 }
 
-/// Up to `count` distinct qualities spread evenly inside `lo..=hi`; one probe is the midpoint.
-fn probe_qualities(lo: u8, hi: u8, count: usize) -> Vec<u8> {
-    let span = (hi - lo) as usize;
-    let mut probes: Vec<u8> = (0..count).map(|i| lo + (span * (i + 1) / (count + 1)) as u8).collect();
+/// Natural-log growth of encoded size per quality point, a typical value used only to aim the
+/// first probes; the search itself relies on the fit/miss bracket, never on this.
+const LOG_SIZE_PER_QUALITY: f64 = 0.045;
+
+/// The quality most likely to land just under `limit`, interpolating between a known fit and a
+/// known miss, or extrapolating from one of them, in log-size.
+fn guess_quality(limit: u64, fit: Option<(u8, u64)>, miss: Option<(u8, u64)>, lo: u8, hi: u8) -> u8 {
+    let ln = |bytes: u64| (bytes.max(1) as f64).ln();
+    let target = ln(limit);
+    let guess = match (fit, miss) {
+        (Some((qf, lf)), Some((qm, lm))) if qm > qf && lm > lf => {
+            qf as f64 + (target - ln(lf)) * (qm - qf) as f64 / (ln(lm) - ln(lf))
+        }
+        (Some((qf, lf)), _) => qf as f64 + (target - ln(lf)) / LOG_SIZE_PER_QUALITY,
+        (None, Some((qm, lm))) => qm as f64 - (ln(lm) - target) / LOG_SIZE_PER_QUALITY,
+        (None, None) => (lo as f64 + hi as f64) / 2.0,
+    };
+    guess.round().clamp(lo as f64, hi as f64) as u8
+}
+
+/// Up to `count` distinct qualities inside `lo..=hi`, centred on `centre` and spaced two apart.
+fn probe_qualities(centre: u8, lo: u8, hi: u8, count: usize) -> Vec<u8> {
+    let half = count as i32 / 2;
+    let mut probes: Vec<u8> = (0..count as i32)
+        .map(|i| (centre as i32 + (i - half) * 2).clamp(lo as i32, hi as i32) as u8)
+        .collect();
+    probes.sort_unstable();
     probes.dedup();
-    if probes.is_empty() {
-        probes.push(lo);
-    }
     probes
 }
 

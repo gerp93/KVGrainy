@@ -26,7 +26,7 @@ impl Encoder for PureEncoder {
         match format {
             Format::Jpeg => JpegEncoder::new_with_quality(&mut out, quality)
                 .write_image(&raster.flattened_rgb(), w, h, ExtendedColorType::Rgb8),
-            Format::Png => match &raster.alpha {
+            Format::Png | Format::PngPalette => match &raster.alpha {
                 Some(_) => PngEncoder::new(&mut out).write_image(&raster.rgba(), w, h, ExtendedColorType::Rgba8),
                 None => PngEncoder::new(&mut out).write_image(&raster.rgb, w, h, ExtendedColorType::Rgb8),
             },

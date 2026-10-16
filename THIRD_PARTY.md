@@ -10,6 +10,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 
 - Every licence below is compatible with distributing the combined work under AGPL-3.0.
 - **MPL-2.0** (`avif-parse`): file-level copyleft, used unmodified; MPL-2.0 permits combination with AGPL-3.0.
+- **GPL-3.0-or-later** (`imagequant`, palette PNG): GPLv3 section 13 allows combining it with AGPL-3.0, which KVGrainy is. Anyone distributing KVGrainy as a whole must follow the AGPL-3.0, which this licence permits. It also means KVGrainy cannot be relicensed under a more permissive licence while it includes imagequant.
 - **`r-efi`** is offered under `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; KVGrainy uses it under MIT.
 - **mozjpeg** (`IJG AND Zlib AND BSD-3-Clause`) and **libwebp** (BSD-3-Clause) are C libraries built from source by their `-sys` crates on native targets only.
 - Not yet included: the Tauri shell, the web app's npm packages, and any bundled ffmpeg. Add them here when they ship (ffmpeg builds must be LGPL-configured or the combination documented).
@@ -64,6 +65,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | either | 1.18.0 | MIT OR Apache-2.0 |
 | equator | 0.4.2 | MIT |
 | equator-macro | 0.4.2 | MIT |
+| equivalent | 1.0.3 | Apache-2.0 OR MIT |
 | fallible_collections | 0.5.2 | MIT OR Apache-2.0 |
 | fast_image_resize | 5.5.0 | MIT OR Apache-2.0 |
 | fax | 0.2.7 | MIT |
@@ -72,16 +74,21 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | getrandom | 0.3.4 | MIT OR Apache-2.0 |
 | gif | 0.14.2 | MIT OR Apache-2.0 |
 | half | 2.7.1 | MIT OR Apache-2.0 |
+| hashbrown | 0.17.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | image | 0.25.10 | MIT OR Apache-2.0 |
 | image-webp | 0.2.4 | MIT OR Apache-2.0 |
+| imagequant | 4.4.1 | GPL-3.0-or-later |
 | imgref | 1.12.3 | CC0-1.0 OR Apache-2.0 |
+| indexmap | 2.14.2 | Apache-2.0 OR MIT |
 | interpolate_name | 0.2.4 | MIT |
 | is_terminal_polyfill | 1.70.2 | MIT OR Apache-2.0 |
 | itertools | 0.14.0 | MIT OR Apache-2.0 |
 | leb128 | 0.2.7 | MIT OR Apache-2.0 |
 | libaom-sys | 0.17.2+libaom.3.11.0 | BSD-2-Clause |
 | libc | 0.2.190 | MIT OR Apache-2.0 |
+| libdeflate-sys | 1.26.1 | Apache-2.0 |
+| libdeflater | 1.26.1 | Apache-2.0 |
 | libfuzzer-sys | 0.4.13 | (MIT OR Apache-2.0) AND NCSA |
 | libwebp-sys | 0.9.6 | MIT |
 | litrs | 1.0.0 | MIT OR Apache-2.0 |
@@ -107,6 +114,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | once_cell | 1.21.4 | MIT OR Apache-2.0 |
 | once_cell_polyfill | 1.70.2 | MIT OR Apache-2.0 |
 | owning_ref | 0.4.1 | MIT |
+| oxipng | 10.2.1 | MIT |
 | paste | 1.0.15 | MIT OR Apache-2.0 |
 | pastey | 0.1.1 | MIT OR Apache-2.0 |
 | png | 0.18.1 | MIT OR Apache-2.0 |
@@ -126,6 +134,7 @@ regenerate it with `python scripts/third_party.py > THIRD_PARTY.md` after changi
 | rayon | 1.12.0 | MIT OR Apache-2.0 |
 | rayon-core | 1.13.0 | MIT OR Apache-2.0 |
 | rgb | 0.8.53 | MIT |
+| rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | simd-adler32 | 0.3.10 | MIT |
 | simd_helpers | 0.1.0 | MIT |
 | ssimulacra2 | 0.5.1 | BSD-2-Clause |
