@@ -677,11 +677,12 @@ footer {
   padding: 2px 12px;
 }
 
-/* ---- Fine-Tune GIF tab only: wider page, drop zone beside the settings, pairs side by side ---- */
+/* ---- Tool page: one width for both Reduce and Fine-Tune GIF so the mode tabs never move. Fine-Tune GIF needs
+   the room (drop zone beside the settings, pairs side by side). Content pages have no data-mode and stay narrow. ---- */
 @media (min-width: 1080px) {
-  html[data-mode='tune'] .top,
-  html[data-mode='tune'] main,
-  html[data-mode='tune'] footer {
+  html[data-mode] .top,
+  html[data-mode] main,
+  html[data-mode] footer {
     max-width: 1180px;
   }
 }
