@@ -9,3 +9,4 @@ src/wasm/
 dist-desktop/
 dist-ads/
 dist-launch/
+demo/
