@@ -228,12 +228,17 @@ const csp = [
         An early build. Nothing leaves your device: there is no server for it to go to. Output is re-encoded from pixels,
         so EXIF and GPS data are always dropped.
       </p>
-      <nav aria-label="More">
-        <ul class="footer-links">
-          {PAGES.filter((p) => p.kind !== 'tool').map((p) => <li><a href={p.path}>{p.title}</a></li>)}
-          <li><a href={SITE.repo}>Source code (AGPL-3.0)</a></li>
-        </ul>
-      </nav>
+      {
+        // The desktop app is the tool only; the guides live on the website and would navigate the window away from it.
+        !desktop && (
+          <nav aria-label="More">
+            <ul class="footer-links">
+              {PAGES.filter((p) => p.kind !== 'tool').map((p) => <li><a href={p.path}>{p.title}</a></li>)}
+              <li><a href={SITE.repo}>Source code (AGPL-3.0)</a></li>
+            </ul>
+          </nav>
+        )
+      }
     </footer>
 
     <script>
