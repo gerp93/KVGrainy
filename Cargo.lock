@@ -669,6 +669,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "kvgrainy-core",
+ "rayon",
  "wasm-bindgen",
 ]
 

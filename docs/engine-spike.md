@@ -73,8 +73,9 @@ Other facts:
    48 MP phone photo would exceed the 4 GB WASM32 limit, and phone browsers kill tabs
    far earlier than that. Scoring must run on a copy capped at about 1 MP (about
    180 MB, about 0.5 s per score in WASM). That would also speed up native.
-4. **Open question:** does scoring a downscaled copy rank candidates the same as scoring
-   full-size? That is Phase 1.4 and decides whether the shared-core route is sound.
+4. **Answered in [metric-study.md](metric-study.md):** scoring a 1 MP copy picks the same
+   candidate (within 2 SSIMULACRA2 points) 99% of the time on 61 photos, and a 12 MP photo
+   peaks at about 240 MB of WASM memory instead of about 2 GB. Photos only; graphics are untested.
 
 ## Not done (limits of this spike)
 
