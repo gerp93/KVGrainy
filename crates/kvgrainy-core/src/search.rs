@@ -100,7 +100,7 @@ pub fn search_one_format(
     report: &dyn Fn(usize),
 ) -> FormatOutcome {
     let reference = Reference::new(source);
-    let result = search_format(encoder, &reference, source, options, format, cancelled, report);
+    let result = search_format(encoder, &reference, source, options, format, STRIP_PROBE_MIN_PIXELS, cancelled, report);
     FormatOutcome { best: result.best, smallest: result.smallest }
 }
 
@@ -152,7 +152,7 @@ pub fn optimize_with(
     #[cfg(not(feature = "parallel"))]
     let format_iter = formats.iter();
     let results: Vec<TaskResult> = format_iter
-        .map(|&format| search_format(encoder, &reference, source, options, format, &cancelled, &report))
+        .map(|&format| search_format(encoder, &reference, source, options, format, STRIP_PROBE_MIN_PIXELS, &cancelled, &report))
         .collect();
 
     if cancelled() {
@@ -213,6 +213,65 @@ const PROBES_PER_ROUND: usize = 1;
 const PNG_HOPELESS_RATIO: f64 = 1.5;
 /// A scale is skipped when the smallest full-size encode, scaled by `scale^2` and this, still exceeds the limit.
 const SKIP_SLACK: f64 = 0.5;
+/// A source with more pixels than this learns the size of its full-size floor encode strip by strip
+/// instead of encoding the whole image (see [`strip_encoded_len`]). At or below it, nothing changes.
+const STRIP_PROBE_MIN_PIXELS: u64 = 3_000_000;
+/// About how many pixels one strip holds. A codec's working memory grows with the image it is given, so
+/// encoding strips keeps the peak near that of a 2 MP image however large the source is.
+const STRIP_PIXELS: u64 = 2_000_000;
+/// Strips are cut on multiples of this many rows (a JPEG MCU is 16 rows), and none is shorter.
+const STRIP_ROW_ALIGN: u32 = 16;
+/// How far over the limit a lossless, no-quality-knob format's strip total may be and still get a real
+/// full-size encode. The total runs a little above the whole image's size (each strip carries its own
+/// headers and loses some context), so a size just over the limit is given the benefit of the doubt.
+const STRIP_FIT_MARGIN: f64 = 1.05;
+/// The same for a format with a quality knob. `fit_at_scale` lets a floor encode miss the limit by 25% and
+/// still searches (sizes are not strictly monotone in quality, small AVIFs especially); a strip total can
+/// overshoot the whole by about 10% (measured: AVIF +8.5%, WebP +1.1%, JPEG +0.6%), so the strip probe
+/// allows that much more, and is never quicker than the whole-image path to give up.
+const STRIP_QUALITY_MARGIN: f64 = 1.25 * 1.10;
+
+/// Horizontal strips `(first row, row count)` covering `height` rows of an image `width` wide, about
+/// [`STRIP_PIXELS`] each, cut on [`STRIP_ROW_ALIGN`] rows. A remainder shorter than one alignment unit is
+/// folded into the last strip, so no strip is tiny.
+fn strip_bounds(width: u32, height: u32) -> Vec<(u32, u32)> {
+    let pixels = width as u64 * height as u64;
+    let wanted = pixels.div_ceil(STRIP_PIXELS).clamp(1, (height / STRIP_ROW_ALIGN).max(1) as u64) as u32;
+    let rows = height.div_ceil(wanted).div_ceil(STRIP_ROW_ALIGN) * STRIP_ROW_ALIGN;
+    let mut strips = Vec::new();
+    let mut start = 0;
+    while start < height {
+        let end = (start + rows).min(height);
+        if height - end < STRIP_ROW_ALIGN {
+            strips.push((start, height - start));
+            break;
+        }
+        strips.push((start, end - start));
+        start = end;
+    }
+    strips
+}
+
+/// The size in bytes `source` would encode to as `format` at `quality`, found by encoding it in strips and
+/// adding them up. The total tracks the whole image's size closely (within a few percent for JPEG, WebP,
+/// AVIF and PNG), but no encode ever sees more than one strip, so a 24 MP photo costs the memory of a 2 MP
+/// one. `None` if cancelled or any strip fails to encode; the caller then encodes the whole image as before.
+fn strip_encoded_len(
+    encoder: &dyn Encoder,
+    source: &Raster,
+    format: Format,
+    quality: u8,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<u64> {
+    let mut total = 0u64;
+    for (start, count) in strip_bounds(source.width, source.height) {
+        if cancelled() {
+            return None;
+        }
+        total += encoder.encode(format, &source.rows(start, count), quality).ok()?.len() as u64;
+    }
+    Some(total)
+}
 
 /// Walk the scale ladder for one format from large to small, stopping once more
 /// shrinking can't help. Cheap relative to trying every scale: a fit at high
@@ -224,6 +283,7 @@ fn search_format(
     source: &Raster,
     options: &Options,
     format: Format,
+    strip_min_pixels: u64,
     cancelled: &dyn Fn() -> bool,
     report: &dyn Fn(usize),
 ) -> TaskResult {
@@ -245,16 +305,37 @@ fn search_format(
                 continue;
             }
         }
-        let resized = source.scaled(scale);
-        let attempt = fit_at_scale(encoder, &resized, options.limit_bytes, format, min_quality, cancelled, &mut smallest)
-            .or_else(|| {
+        // A large image's full-size floor encode is the most memory-hungry thing the search does (hundreds
+        // of MB per format in a browser) and, for any limit well below the image's natural size, it only
+        // finds out that full size cannot fit. Measure that floor size in strips instead, and encode the
+        // whole image only when it might actually fit, which is exactly what the search did before.
+        let hopeless_at_full = index == 0
+            && source.width as u64 * source.height as u64 > strip_min_pixels
+            // Palette PNG keeps encoding whole: each strip builds its own palette, so the strip total runs about
+            // 10% under the whole (measured) and the quantizer takes about twice as long in strips. It is a
+            // native-only format, where memory is not the constraint.
+            && format != Format::PngPalette
+            && strip_encoded_len(encoder, source, format, if format.has_quality() { MIN_QUALITY } else { 100 }, cancelled)
+                .is_some_and(|len| {
+                    smallest = smallest.min(len);
+                    let allowed = if format.has_quality() {
+                        options.limit_bytes as f64 * STRIP_QUALITY_MARGIN
+                    } else {
+                        options.limit_bytes as f64 * STRIP_FIT_MARGIN
+                    };
+                    len as f64 > allowed
+                });
+        let attempt = if hopeless_at_full {
+            None
+        } else {
+            let resized = source.scaled(scale);
+            fit_at_scale(encoder, &resized, options.limit_bytes, format, min_quality, cancelled, &mut smallest).or_else(|| {
                 // The warm start can be too optimistic; retry from the floor before giving up on this scale.
                 (min_quality > MIN_QUALITY)
-                    .then(|| {
-                        fit_at_scale(encoder, &resized, options.limit_bytes, format, MIN_QUALITY, cancelled, &mut smallest)
-                    })
+                    .then(|| fit_at_scale(encoder, &resized, options.limit_bytes, format, MIN_QUALITY, cancelled, &mut smallest))
                     .flatten()
-            });
+            })
+        };
 
         if index == 0 {
             floor_len_full = Some(smallest);
@@ -423,4 +504,131 @@ fn encode_probes(
     #[cfg(not(feature = "parallel"))]
     let iter = probes.iter();
     iter.map(|&q| (q, encoder.encode(format, resized, q))).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicU64;
+
+    /// An encoder whose output size is exactly proportional to the pixels it is given (one byte per
+    /// pixel at quality 100), so a test can tell what the search encoded and how large.
+    #[derive(Default)]
+    struct Linear {
+        largest_encode_pixels: AtomicU64,
+    }
+
+    impl Encoder for Linear {
+        fn encode(&self, _format: Format, raster: &Raster, quality: u8) -> Result<Vec<u8>, String> {
+            let pixels = raster.width as u64 * raster.height as u64;
+            self.largest_encode_pixels.fetch_max(pixels, Ordering::Relaxed);
+            Ok(vec![0; (pixels * quality as u64 / 100 + 100) as usize])
+        }
+        fn decode(&self, _format: Format, _payload: &[u8]) -> Option<Raster> {
+            Some(Raster { width: 8, height: 8, rgb: vec![128; 8 * 8 * 3], alpha: None })
+        }
+    }
+
+    fn picture(width: u32, height: u32) -> Raster {
+        Raster { width, height, rgb: vec![100; (width * height * 3) as usize], alpha: None }
+    }
+
+    fn search(encoder: &Linear, source: &Raster, limit: u64, format: Format, strip_min_pixels: u64) -> TaskResult {
+        let options = Options { format: Some(format), ..Options::new(limit) };
+        let reference = Reference::new(source);
+        search_format(encoder, &reference, source, &options, format, strip_min_pixels, &|| false, &|_| {})
+    }
+
+    /// What a search chose, as something comparable: size, scale and quality of the winner.
+    fn chosen(result: &TaskResult) -> Option<(usize, u32, Option<u8>)> {
+        result.best.as_ref().map(|c| (c.bytes.len(), (c.scale * 100.0) as u32, c.quality))
+    }
+
+    #[test]
+    fn strips_cover_every_row_once_and_none_is_tiny() {
+        for (width, height) in [(4000, 3000), (6000, 4000), (2400, 1800), (100_000, 40), (7, 900_000), (3000, 1001), (5000, 5000)] {
+            let strips = strip_bounds(width, height);
+            let mut next = 0;
+            for &(start, count) in &strips {
+                assert_eq!(start, next, "{width}x{height}: strips must be contiguous");
+                assert!(count >= STRIP_ROW_ALIGN.min(height), "{width}x{height}: a strip of {count} rows is tiny");
+                next = start + count;
+            }
+            assert_eq!(next, height, "{width}x{height}: strips must cover the whole height");
+        }
+        // 12 MP is cut into several strips of about 2 MP, not one.
+        assert!(strip_bounds(4000, 3000).len() >= 5);
+        // A small image is one strip.
+        assert_eq!(strip_bounds(640, 480), vec![(0, 480)]);
+    }
+
+    #[test]
+    fn a_strip_carries_its_rows_and_alpha() {
+        let mut image = picture(4, 6);
+        image.alpha = Some((0..24).collect());
+        image.rgb = (0..72).collect();
+        let strip = image.rows(2, 3);
+        assert_eq!((strip.width, strip.height), (4, 3));
+        assert_eq!(strip.rgb, (24..60).collect::<Vec<u8>>());
+        assert_eq!(strip.alpha, Some((8..20).collect()));
+    }
+
+    #[test]
+    fn a_hopeless_full_size_is_found_without_encoding_the_whole_image() {
+        let source = picture(2400, 1800); // 4.3 MP: over the strip threshold
+        let encoder = Linear::default();
+        // The full-size floor encode is ~864 KB; the limit is 100 KB, so full size can never fit.
+        let result = search(&encoder, &source, 100_000, Format::Jpeg, STRIP_PROBE_MIN_PIXELS);
+        let best = result.best.expect("a smaller scale fits");
+        assert!(best.scale <= 0.45, "chose scale {}", best.scale);
+        let largest = encoder.largest_encode_pixels.load(Ordering::Relaxed);
+        assert!(largest < 2_160_000, "encoded {largest} pixels at once; the whole image is 4,320,000");
+    }
+
+    #[test]
+    fn striping_changes_nothing_the_search_chooses() {
+        let source = picture(2400, 1800);
+        // One format with a quality knob and one without.
+        for format in [Format::Jpeg, Format::Png] {
+            // From too small to fit anywhere, through the scale ladder (and the borderline where the floor
+            // encode just misses), to generous enough for full size.
+            for limit in [20_000u64, 100_000, 350_000, 900_000, 4_500_000] {
+                let before = search(&Linear::default(), &source, limit, format, u64::MAX); // striping off: the old path
+                let after = search(&Linear::default(), &source, limit, format, STRIP_PROBE_MIN_PIXELS);
+                assert_eq!(chosen(&before), chosen(&after), "{format:?} at a limit of {limit} bytes");
+                // The "smallest size tried" is a strip total when full size was never encoded whole, so it
+                // may differ a little (here: the fake encoder's per-strip header bytes), never by much.
+                let (a, b) = (before.smallest as f64, after.smallest as f64);
+                assert!((a - b).abs() <= a * 0.01, "{format:?} at {limit}: smallest {a} vs {b}");
+            }
+        }
+    }
+
+    #[test]
+    fn full_size_is_still_encoded_when_it_can_fit() {
+        let source = picture(2400, 1800);
+        let encoder = Linear::default();
+        let result = search(&encoder, &source, 6_000_000, Format::Jpeg, STRIP_PROBE_MIN_PIXELS);
+        assert_eq!(result.best.expect("fits at full size").scale, 1.0);
+        assert_eq!(encoder.largest_encode_pixels.load(Ordering::Relaxed), 2400 * 1800);
+    }
+
+    #[test]
+    fn palette_png_is_still_encoded_whole() {
+        let source = picture(2400, 1800);
+        let encoder = Linear::default();
+        // Hopeless at full size (floor encode ~864 KB against a 100 KB limit), yet the whole image is encoded,
+        // exactly as before: strips are not used for palette PNG.
+        let _ = search(&encoder, &source, 100_000, Format::PngPalette, STRIP_PROBE_MIN_PIXELS);
+        assert_eq!(encoder.largest_encode_pixels.load(Ordering::Relaxed), 2400 * 1800);
+    }
+
+    #[test]
+    fn a_small_image_is_never_cut_into_strips() {
+        let source = picture(1600, 1200); // 1.9 MP, under the threshold
+        let encoder = Linear::default();
+        let _ = search(&encoder, &source, 10_000, Format::Jpeg, STRIP_PROBE_MIN_PIXELS);
+        // The old path encodes the full image once to learn it cannot fit.
+        assert_eq!(encoder.largest_encode_pixels.load(Ordering::Relaxed), 1600 * 1200);
+    }
 }

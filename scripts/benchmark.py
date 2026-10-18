@@ -27,9 +27,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PIL import Image, ImageDraw, ImageOps  # noqa: E402
-
-import kvgrainy  # noqa: E402
+from PIL import Image, ImageCms, ImageDraw, ImageOps  # noqa: E402
 
 DEFAULT_CORPUS = Path(__file__).resolve().parent.parent / "benchmark" / "corpus"
 STILL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
@@ -96,6 +94,36 @@ def flatten(image: Image.Image) -> Image.Image:
     return image.convert("RGB")
 
 
+def load_static_image(path: Path) -> Image.Image:
+    """Open a still upright (EXIF orientation applied) and in sRGB, so every contestant starts from the same pixels."""
+    with Image.open(path) as opened:
+        opened.load()
+        image = ImageOps.exif_transpose(opened)
+    icc = image.info.get("icc_profile")
+    if icc and image.mode in ("RGB", "RGBA", "LA", "L", "CMYK"):
+        alpha = image.getchannel("A") if image.mode in ("RGBA", "LA") else None
+        base = image.convert("RGB" if image.mode == "RGBA" else "L") if alpha is not None else image
+        try:
+            converted = ImageCms.profileToProfile(
+                base, ImageCms.ImageCmsProfile(io.BytesIO(icc)), ImageCms.createProfile("sRGB"),
+                outputMode="RGB", renderingIntent=ImageCms.Intent.PERCEPTUAL,
+            )
+        except (ImageCms.PyCMSError, OSError):
+            pass  # unreadable profile: assume sRGB, as the app does
+        else:
+            if alpha is not None:
+                converted.putalpha(alpha)
+            return converted
+    return image.convert("RGB") if image.mode == "CMYK" else image
+
+
+def get_working_image(image: Image.Image, fmt: str) -> Image.Image:
+    """The pixels a Pillow encoder can take: JPEG has no alpha (composite on white), the rest keep RGB(A)."""
+    if fmt == "JPEG":
+        return flatten(image)
+    return image if image.mode in ("RGB", "RGBA") else image.convert("RGB")
+
+
 def score_output(reference_png: Path, output: Path, work: Path) -> float:
     from ssimulacra2 import compute_ssimulacra2
 
@@ -129,7 +157,7 @@ def bisect_quality(encode: Callable[[int], bytes | None], limit: int, lo: int = 
 
 def pillow_encoder(fmt: str, ext: str):
     def run(source: Image.Image, limit: int, work: Path) -> tuple[bytes, str] | None:
-        image = kvgrainy.get_working_image(source, fmt)
+        image = get_working_image(source, fmt)
 
         def encode(quality: int) -> bytes | None:
             buffer = io.BytesIO()
@@ -140,19 +168,6 @@ def pillow_encoder(fmt: str, ext: str):
         return (payload, ext) if payload else None
 
     return run
-
-
-def kvgrainy_engine(source: Image.Image, limit: int, work: Path) -> tuple[bytes, str] | None:
-    src = work / "kv_input.png"
-    source.save(src)
-    out = work / "kv_out"
-    out.mkdir(exist_ok=True)
-    try:
-        candidate = kvgrainy.optimize_image(src, limit, out)
-    except RuntimeError:
-        return None
-    ext = ".jpg" if candidate.fmt == "JPEG" else f".{candidate.fmt.lower()}"
-    return candidate.image_bytes, ext
 
 
 RUST_CLI = Path(__file__).resolve().parent.parent / "target" / "release" / "kvgrainy"
@@ -196,7 +211,6 @@ def cli_encoder(tool: str, ext: str, build: Callable[[Path, Path, int], list[str
 
 
 CONTESTANTS: dict[str, Callable] = {
-    "kvgrainy": kvgrainy_engine,
     "kvgrainy-rs": kvgrainy_rust,
     "pillow-jpeg-q": pillow_encoder("JPEG", ".jpg"),
     "pillow-webp-q": pillow_encoder("WEBP", ".webp"),
@@ -220,7 +234,7 @@ def available(name: str) -> bool:
 def run_benchmark(files: list[Path], ratios: list[float], names: list[str]) -> list[str]:
     rows = ["| image | limit | tool | size | SSIMULACRA2 | time |", "|---|---|---|---|---|---|"]
     for path in files:
-        source = kvgrainy.load_static_image(path)
+        source = load_static_image(path)
         original_size = path.stat().st_size
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)

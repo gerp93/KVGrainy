@@ -52,6 +52,10 @@
 
 html {
   background: var(--bg);
+  /* Keep the room a scrollbar takes whether or not the page scrolls. Without it, switching from a tall page to a
+     short one (Reduce to About on a small window) loses the scrollbar and the centred content, tab bar included,
+     jumps by half its width. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -491,6 +495,11 @@ button:disabled {
 }
 .card .note.bad {
   color: var(--danger);
+}
+.drop-notice {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 0.95rem;
 }
 
 .row {

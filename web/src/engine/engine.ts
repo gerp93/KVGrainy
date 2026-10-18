@@ -1,10 +1,12 @@
 import type { FrameSource } from './frames';
+import { readDeviceHints, workerLimit } from './parallelism';
 import { SCALE_FACTORS, chooseBest, formatsFor, type Effort } from './search';
 import type { Format, FormatResult, OptimizeResult, Raster } from './types';
 import type { FromWorker, ToWorker } from './worker';
 
 /** Refuse inputs above this many pixels: the working copies would not fit in a phone's memory. */
-const MAX_PIXELS = 50_000_000;
+/** The browser holds several copies of the pixels (one per format worker); past this a phone runs out of memory. */
+const MAX_PIXELS = 24_000_000;
 
 export interface Source {
   raster: Raster;
@@ -30,7 +32,9 @@ export async function loadSource(file: Blob): Promise<Source> {
   try {
     const { width, height } = bitmap;
     if (width * height > MAX_PIXELS) {
-      throw new Error(`This image is ${(width * height / 1e6).toFixed(0)} megapixels; the limit here is ${MAX_PIXELS / 1e6}.`);
+      throw new Error(
+        `This image is ${(width * height / 1e6).toFixed(0)} megapixels. The browser version handles up to ${MAX_PIXELS / 1e6} (a typical 12 MP phone photo is fine); the desktop app has no such limit.`,
+      );
     }
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -50,7 +54,8 @@ function hasTransparency(data: Uint8ClampedArray): boolean {
 
 /**
  * Search for the best version of `source` under `options.limit` bytes. One Web Worker per
- * format, run in parallel. Aborting `signal` stops the workers and rejects with an AbortError.
+ * format, run in parallel (one at a time for a large image on a constrained device: parallelism.ts).
+ * Aborting `signal` stops the workers and rejects with an AbortError.
  */
 export function optimizeImage(
   source: Source,
@@ -76,7 +81,16 @@ export function optimizeImage(
     if (signal.aborted) return fail(new DOMException('Cancelled', 'AbortError'));
     signal.addEventListener('abort', () => fail(new DOMException('Cancelled', 'AbortError')), { once: true });
 
-    for (const format of formats) {
+    // Normally every format runs at once. A large image on a phone or low-memory device runs them one after
+    // another instead (see parallelism.ts): the same result, a bounded memory peak, more time.
+    const limit = workerLimit(source.raster.width * source.raster.height, formats.length, readDeviceHints());
+    const pending = [...formats];
+    const launchNext = () => {
+      const next = pending.shift();
+      if (next !== undefined && !settled) launch(next);
+    };
+
+    const launch = (format: Format) => {
       const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
       workers.push(worker);
       worker.onmessage = (event: MessageEvent<FromWorker>) => {
@@ -91,6 +105,8 @@ export function optimizeImage(
             settled = true;
             onProgress(1);
             resolve(chooseBest(results, options.limit));
+          } else {
+            launchNext();
           }
         } else if (msg.type === 'error') {
           fail(new Error(msg.message));
@@ -109,7 +125,9 @@ export function optimizeImage(
         data: copy,
       };
       worker.postMessage(message, [copy]);
-    }
+    };
+
+    for (let started = 0; started < limit; started++) launchNext();
   });
 }
 

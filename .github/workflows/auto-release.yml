@@ -23,17 +23,28 @@ on:
       - '!tests/**'
       - '!web/src/content/**'
       - '!.github/workflows/*-ci.yml'
-      - '!gui.py'
-      - '!kvgrainy.py'
-      - '!theming.py'
-      - '!updater.py'
-      - '!requirements.txt'
 
 permissions:
   contents: write
 
 jobs:
+  # A release is only cut when this commit's own CI passed: the web tests and the Windows desktop build.
+  # (The desktop browser-driven e2e job is informational and cannot fail that workflow.) CI workflows only
+  # run for the paths they list, so a change none of them covers is released after a short grace period.
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for the web and desktop CI of this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/wait_for_ci.py --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" web-ci.yml desktop-ci.yml
+
   version:
+    needs: gate
     runs-on: ubuntu-latest
     outputs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}

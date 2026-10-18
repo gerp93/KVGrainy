@@ -53,10 +53,10 @@ describe('effectiveIndex', () => {
   });
   it('spans the usable range even when almost nothing fits', () => {
     expect(effectiveIndex(100, 42, 43)).toBe(42);
-    expect(effectiveIndex(0, 42, 43)).toBe(43); // span floors at 1, matching the desktop app
+    expect(effectiveIndex(0, 42, 43)).toBe(43); // span floors at 1, span is never zero
   });
-  it('rounds halves to even, like Python', () => {
-    // percent 50 over a span of 5 is 2.5 steps: Python's round(2.5) is 2, round(3.5) is 4
+  it('rounds halves to even (banker\'s rounding)', () => {
+    // percent 50 over a span of 5 is 2.5 steps: round-half-even gives 2 for 2.5 and 4 for 3.5
     expect(effectiveIndex(50, 0, 6)).toBe(2);
     expect(effectiveIndex(30, 0, 6)).toBe(4); // 0.7 * 5 = 3.5
   });

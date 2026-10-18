@@ -1,0 +1,32 @@
+name: A picture it handles badly
+description: The result is too big, looks bad, or the wrong format for the limit you set.
+labels: ["quality"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do **not** attach a private photo. A description, or a similar public image, is enough.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did you use it?
+      options: [Web tool, Desktop app, Command line]
+    validations: { required: true }
+  - type: input
+    id: system
+    attributes:
+      label: Browser or app version, and system
+      placeholder: "Chrome 140 on Windows 11, or KVGrainy 1.0.30 on macOS 15"
+    validations: { required: true }
+  - type: input
+    id: limit
+    attributes:
+      label: Size limit, and the format you picked (or Auto)
+      placeholder: "100 KB, Auto"
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What did you get, and what did you expect?
+      description: The kind of image (photo, screenshot, logo, transparent PNG), its size and dimensions, and what looks wrong.
+    validations: { required: true }

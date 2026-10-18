@@ -35,9 +35,11 @@ jobs:
       - name: Rust unit tests
         run: cargo test
         working-directory: desktop/src-tauri
-      # Builds the web UI for the desktop target, embeds it, and compiles the app (no installer).
+      # Builds the web UI for the desktop target, embeds it, and compiles the app (no installer). This is the build the
+      # end-to-end tests drive, so it uses the test config, whose only difference is a window that opens a DevTools port
+      # (desktop/src-tauri/tauri.e2e.conf.json). The shipped app is built without it by release-desktop.yml.
       - name: Build the debug app
-        run: npx tauri build --debug --no-bundle
+        run: npx tauri build --debug --no-bundle --config src-tauri/tauri.e2e.conf.json
         working-directory: desktop
       - uses: actions/upload-artifact@v4
         with:
@@ -68,6 +70,11 @@ jobs:
       # The specs share fixtures with the web app's, which use its packages (gifenc).
       - run: npm ci
         working-directory: web
+      # The window is drawn by the WebView2 runtime. A hosted runner has it, but the image notes do not list it, so
+      # this prints the version in every run and installs the runtime only if it is ever missing.
+      - name: Make sure the WebView2 runtime is installed
+        shell: pwsh
+        run: ./desktop/e2e/ensure-webview2.ps1
       # The Playwright browser is not needed: the tests attach to the app's own WebView2 over CDP.
       - name: Drive the real app
         run: npx playwright test

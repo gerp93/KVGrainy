@@ -1,0 +1,16 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "KVGrainy",
+        "width": 1100,
+        "height": 860,
+        "minWidth": 420,
+        "minHeight": 560,
+        "dragDropEnabled": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --remote-debugging-port=0"
+      }
+    ]
+  }
+}
