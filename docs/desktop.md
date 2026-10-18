@@ -91,10 +91,10 @@ builds and tests it on Windows.
 
 - macOS and Linux: the release workflow builds them, but nothing here has run on either (see docs/release.md).
 - Saving through the native dialog: the dialog cannot be automated; the Rust path is covered by review only.
-- The end-to-end tests have never been seen to pass on a hosted GitHub runner. Until 2026-10-18 they failed because the
-  debugging flag never reached the browser (see above), not because of the runner; with the test config they should connect,
-  and the CI job stays informational until a run proves it. They were said to pass on a developer machine, but that was not
-  checked against the current library versions.
+- The end-to-end tests now run on a hosted GitHub runner (9 of 10 passed on the first run with the test config, 2026-10-18; the
+  tenth found a real layout bug, fixed in the same change). Until then they had never passed there, because the debugging flag
+  never reached the browser (see above), not because of the runner. The CI job stays informational for now: let it pass
+  a few runs in a row, then drop `continue-on-error` from the `e2e` job in `desktop-ci.yml` so it can block a bad change.
 
 ## Verified on Windows 11 (2026-10-16)
 
