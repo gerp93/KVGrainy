@@ -1,0 +1,62 @@
+name: Web deploy
+
+# Publishes the web tool (web/dist) to Cloudflare Pages, served at https://kvgrainy.com.
+# It builds on every web change merged to main, but only uploads when the repository has both
+# secrets below, so the workflow is harmless (a skipped upload, not a failure) until the owner
+# has created the Cloudflare account and project. Setup steps: docs/web-deploy.md.
+#
+# Search engines stay out (noindex + robots Disallow) until the repository variable
+# WEB_LAUNCH is set to 1. Ads stay off; check-ads fails the build if a placeholder slips in.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/web-deploy.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: web-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PUBLIC_SITE_URL: https://kvgrainy.com
+      PUBLIC_LAUNCH: ${{ vars.WEB_LAUNCH }}
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # Same wasm-bindgen CLI pinning as web-ci.yml (scripts/build-wasm.mjs checks the version).
+      - id: bindgen
+        working-directory: .
+        run: echo "version=$(grep -A1 'name = "wasm-bindgen"' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: bindgen-cache
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ steps.bindgen.outputs.version }}
+      - if: steps.bindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version ${{ steps.bindgen.outputs.version }} --locked
+      - run: npm ci
+      - run: npm run build
+      - run: npm run budgets
+      - run: npm run check-ads
+      - name: Skip the upload when Cloudflare is not set up yet
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set; built but did not deploy. See docs/web-deploy.md."
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx --yes wrangler@4 pages deploy dist --project-name=kvgrainy --branch=main
