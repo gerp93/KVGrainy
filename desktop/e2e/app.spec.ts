@@ -1,6 +1,5 @@
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
-import { type AddressInfo, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -11,39 +10,34 @@ import { animatedGif, flatPng, photoPng } from '../../web/e2e/fixture';
 // running in the native Rust core through Tauri commands (not the WebAssembly build).
 
 const exe = resolve(import.meta.dirname, '../src-tauri/target/debug/kvgrainy-desktop.exe');
-// The DevTools port is chosen at start-up (see freePort): a fixed one can fall in a range Windows reserves.
-let PORT = 0;
 let app: ChildProcess;
 let browser: Browser;
 let page: Page;
 const work = mkdtempSync(join(tmpdir(), 'kvgrainy-desktop-e2e-'));
+// WEBVIEW2_USER_DATA_FOLDER: the browser keeps its profile in EBWebView below it.
+const userData = join(work, 'webview');
 
 // The app's own output goes to test-results/app.log, which CI uploads when a run fails, so a hosted
 // runner that cannot start the window says why instead of just timing out.
 const logPath = resolve(import.meta.dirname, '../test-results/app.log');
 
 /**
- * A TCP port the operating system has just let us bind. Windows reserves ranges of ports (for Hyper-V and
- * containers, and a hosted runner is a Hyper-V machine), and a browser told to listen on a reserved port fails
- * silently, so a fixed number can work on one machine and never open on another.
+ * How the test gets at the window: the app is built with `--remote-debugging-port=0` in its window's
+ * `additionalBrowserArgs` (src-tauri/tauri.e2e.conf.json, used only for the test build), so the browser
+ * picks a free port and writes it to DevToolsActivePort in its user-data folder, and this reads it from there.
+ *
+ * The obvious way, the WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS environment variable, does not work: the
+ * Tauri/wry layer always sets the browser's arguments itself, and that wins (the browser's command line, captured
+ * on a hosted runner, had wry's `--disable-features=...` and our `--user-data-dir` but no debugging flag).
  */
-function freePort(): Promise<number> {
-  return new Promise((done, fail) => {
-    const probe = createServer();
-    probe.once('error', fail);
-    probe.listen(0, '127.0.0.1', () => {
-      const { port } = probe.address() as AddressInfo;
-      probe.close(() => done(port));
-    });
-  });
-}
+const portFile = join(userData, 'EBWebView', 'DevToolsActivePort');
 
 /** What the machine looked like when the window could not be reached (diagnose.ps1); never throws. */
 function diagnose(): string {
   try {
     return execFileSync(
       'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve(import.meta.dirname, 'diagnose.ps1'), '-Port', String(PORT), '-ScreenshotPath', join(dirname(logPath), 'desktop.png')],
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve(import.meta.dirname, 'diagnose.ps1'), '-UserDataDir', userData, '-ScreenshotPath', join(dirname(logPath), 'desktop.png')],
       { encoding: 'utf8', timeout: 90_000 },
     );
   } catch (error) {
@@ -54,31 +48,32 @@ function diagnose(): string {
 test.beforeAll(async () => {
   if (!existsSync(exe)) throw new Error(`the app has not been built: ${exe}`);
   mkdirSync(dirname(logPath), { recursive: true });
-  PORT = await freePort();
   const log = openSync(logPath, 'w');
   app = spawn(exe, [], {
-    env: {
-      ...process.env,
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
-      WEBVIEW2_USER_DATA_FOLDER: join(work, 'webview'),
-    },
+    env: { ...process.env, WEBVIEW2_USER_DATA_FOLDER: userData },
     stdio: ['ignore', log, log],
   });
   closeSync(log);
   let exited: number | null = null;
   app.on('exit', (code) => (exited = code ?? -1));
+  let port = 0;
   for (let attempt = 0; attempt < 150 && !browser; attempt++) {
     if (exited !== null) break;
-    try {
-      browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
-    } catch {
-      await sleep(1000);
+    if (!port && existsSync(portFile)) port = Number.parseInt(readFileSync(portFile, 'utf8'), 10) || 0;
+    if (port) {
+      try {
+        browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+        continue;
+      } catch {
+        /* not accepting connections yet */
+      }
     }
+    await sleep(1000);
   }
   if (!browser) {
     const output = existsSync(logPath) ? readFileSync(logPath, 'utf8').slice(-3000) : '(no output)';
     throw new Error(
-      `could not reach the app over the WebView2 DevTools port (${exited === null ? 'still running' : `exited with ${exited}`}). App output:
+      `could not reach the app over the WebView2 DevTools port (${exited === null ? 'still running' : `exited with ${exited}`}${port ? `, port ${port}` : ', no DevToolsActivePort file'}). App output:
 ${output}
 
 Machine state at that moment:

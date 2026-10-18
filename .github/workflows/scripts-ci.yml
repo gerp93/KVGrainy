@@ -4,10 +4,10 @@ name: Scripts CI
 # Windows-only PowerShell scripts that no Linux test run executes. Standard library only.
 on:
   pull_request:
-    paths: ["scripts/**", "tests/**", "desktop/e2e/*.ps1", ".github/workflows/scripts-ci.yml"]
+    paths: ["scripts/**", "tests/**", "desktop/e2e/*.ps1", "desktop/src-tauri/tauri*.json", ".github/workflows/*.yml"]
   push:
     branches: [main]
-    paths: ["scripts/**", "tests/**", "desktop/e2e/*.ps1", ".github/workflows/scripts-ci.yml"]
+    paths: ["scripts/**", "tests/**", "desktop/e2e/*.ps1", "desktop/src-tauri/tauri*.json", ".github/workflows/*.yml"]
 
 jobs:
   test:

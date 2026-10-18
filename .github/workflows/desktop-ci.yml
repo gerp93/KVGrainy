@@ -35,9 +35,11 @@ jobs:
       - name: Rust unit tests
         run: cargo test
         working-directory: desktop/src-tauri
-      # Builds the web UI for the desktop target, embeds it, and compiles the app (no installer).
+      # Builds the web UI for the desktop target, embeds it, and compiles the app (no installer). This is the build the
+      # end-to-end tests drive, so it uses the test config, whose only difference is a window that opens a DevTools port
+      # (desktop/src-tauri/tauri.e2e.conf.json). The shipped app is built without it by release-desktop.yml.
       - name: Build the debug app
-        run: npx tauri build --debug --no-bundle
+        run: npx tauri build --debug --no-bundle --config src-tauri/tauri.e2e.conf.json
         working-directory: desktop
       - uses: actions/upload-artifact@v4
         with:

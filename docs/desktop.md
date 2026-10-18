@@ -68,10 +68,20 @@ no separate desktop theme code and no KVG_Standards exception needed.
 cd web && npm ci && cd ../desktop && npm ci
 cd desktop
 npx tauri dev                          # UI dev server + native window
-npx tauri build --debug --no-bundle    # embeds the UI, builds desktop/src-tauri/target/debug/kvgrainy-desktop.exe
+npx tauri build --debug --no-bundle --config src-tauri/tauri.e2e.conf.json   # the test build (see below)
 npx playwright test                    # drives that exe over WebView2's DevTools port (Windows)
 cd src-tauri && cargo test             # Rust unit tests
 ```
+
+**The test build opens a debugging port; the shipped app does not.** The end-to-end tests drive the real window through
+WebView2's DevTools (CDP) port. That port has to be switched on in the window's `additionalBrowserArgs`: setting the
+`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment variable does **not** work, because the wry layer under Tauri always
+sets the browser's arguments itself and that wins (found by reading the browser's command line on a hosted runner, which had
+wry's `--disable-features=...` and the test's `--user-data-dir` but no debugging flag). So `src-tauri/tauri.e2e.conf.json`
+repeats the main window with `--remote-debugging-port=0` added (the browser picks a free port and writes it to
+`DevToolsActivePort` in its user-data folder, which the test reads), and only the test build uses it. `tests/test_e2e_config.py`
+checks that the two window definitions otherwise match, that `tauri.conf.json` never carries a debugging flag, and that no
+release workflow uses the test config.
 
 `desktop/src-tauri` is deliberately **not** a member of the root Cargo workspace: Tauri needs system
 libraries (WebKitGTK on Linux) that the Rust CI job does not install. `.github/workflows/desktop-ci.yml`
@@ -81,8 +91,10 @@ builds and tests it on Windows.
 
 - macOS and Linux: the release workflow builds them, but nothing here has run on either (see docs/release.md).
 - Saving through the native dialog: the dialog cannot be automated; the Rust path is covered by review only.
-- The end-to-end tests do not run on a hosted GitHub runner: the app starts there but WebView2 never opens
-  its DevTools port. They pass on a developer machine, and the CI job is informational.
+- The end-to-end tests have never been seen to pass on a hosted GitHub runner. Until 2026-10-18 they failed because the
+  debugging flag never reached the browser (see above), not because of the runner; with the test config they should connect,
+  and the CI job stays informational until a run proves it. They were said to pass on a developer machine, but that was not
+  checked against the current library versions.
 
 ## Verified on Windows 11 (2026-10-16)
 

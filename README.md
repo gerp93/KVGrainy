@@ -40,7 +40,7 @@ Windows native builds need NASM 2.16.x and Perl on PATH (see [docs/engine-spike.
 cargo test --workspace                       # the Rust core and CLI
 cd web && npm ci && npm test                 # web unit tests (run the real core in WebAssembly)
 cd web && npm run build && npm run test:e2e  # production build and the Playwright browser tests
-cd desktop && npm ci && npx tauri build --debug --no-bundle && npx playwright test   # desktop (e2e: Windows)
+cd desktop && npm ci && npx tauri build --debug --no-bundle --config src-tauri/tauri.e2e.conf.json && npx playwright test   # desktop (e2e: Windows)
 python -m unittest discover -s tests -v      # release-manifest generator
 ```
 

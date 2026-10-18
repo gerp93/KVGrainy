@@ -1,6 +1,6 @@
 # What the machine looks like when the app's window could not be reached. The end-to-end test runs this at the
 # moment it gives up, and puts the output in its error message, so a failed CI run says why.
-param([int]$Port, [string]$ScreenshotPath)
+param([string]$UserDataDir, [string]$ScreenshotPath)
 $ErrorActionPreference = 'Continue'
 
 function Section([string]$Name, [scriptblock]$Body) {
@@ -25,11 +25,12 @@ Section 'processes (the app, WebView2, Edge)' {
   Get-Process | Where-Object { $_.ProcessName -match 'kvgrainy|msedgewebview2|msedge' } |
     Select-Object Id, ProcessName, SessionId, Responding, MainWindowTitle | Format-Table -AutoSize
 }
-Section "DevTools port ${Port}: does anything answer?" {
-  try {
-    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/json/version" -UseBasicParsing -TimeoutSec 5
-    "HTTP $($r.StatusCode): $($r.Content.Substring(0, [Math]::Min(300, $r.Content.Length)))"
-  } catch { "no answer: $($_.Exception.Message)" }
+Section 'the browser profile folder and its DevToolsActivePort file (the port the browser chose)' {
+  $port = Join-Path $UserDataDir 'EBWebView\DevToolsActivePort'
+  if (Test-Path $port) { "DevToolsActivePort:"; Get-Content $port } else { "(no $port)" }
+  if (Test-Path $UserDataDir) {
+    Get-ChildItem $UserDataDir -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 40 -ExpandProperty FullName
+  } else { "(no folder $UserDataDir)" }
 }
 Section 'TCP port ranges Windows reserves (a browser cannot listen on these)' {
   netsh int ipv4 show excludedportrange protocol=tcp

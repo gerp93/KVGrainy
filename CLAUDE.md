@@ -14,7 +14,7 @@ cargo run --release -p kvgrainy-cli -- photo.jpg --limit 500kb --output ./reduce
 cd web && npm ci && npm test && npm run build && npm run budgets && npm run check-ads && npm run test:ads && npm run test:e2e
 
 # Desktop app (Tauri around the same UI, native core; Windows e2e; see docs/desktop.md)
-cd desktop && npm ci && npx tauri build --debug --no-bundle && npx playwright test
+cd desktop && npm ci && npx tauri build --debug --no-bundle --config src-tauri/tauri.e2e.conf.json && npx playwright test
 
 # Release-manifest generator (stdlib unittest, no pytest dependency)
 python -m unittest discover -s tests -v
