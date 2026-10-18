@@ -1,12 +1,13 @@
 name: Scripts CI
 
-# The Python tooling (release manifests, the CI gate used by releases and deploys). Standard library only.
+# The Python tooling (release manifests, the CI gate used by releases and deploys), and the syntax of the
+# Windows-only PowerShell scripts that no Linux test run executes. Standard library only.
 on:
   pull_request:
-    paths: ["scripts/**", "tests/**", ".github/workflows/scripts-ci.yml"]
+    paths: ["scripts/**", "tests/**", "desktop/e2e/*.ps1", ".github/workflows/scripts-ci.yml"]
   push:
     branches: [main]
-    paths: ["scripts/**", "tests/**", ".github/workflows/scripts-ci.yml"]
+    paths: ["scripts/**", "tests/**", "desktop/e2e/*.ps1", ".github/workflows/scripts-ci.yml"]
 
 jobs:
   test:
@@ -14,3 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m unittest discover -s tests -v
+      # A typo in a Windows-only script otherwise surfaces only after a ten-minute desktop run (one already did).
+      - name: Parse the PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in Get-ChildItem -Path desktop/e2e -Filter *.ps1) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors) | Out-Null
+            foreach ($e in $errors) {
+              "::error file=$($file.Name),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $failed = $true
+            }
+            "$($file.Name): $(@($errors).Count) syntax error(s)"
+          }
+          if ($failed) { exit 1 }

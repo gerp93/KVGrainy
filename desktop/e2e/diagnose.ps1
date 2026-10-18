@@ -25,7 +25,7 @@ Section 'processes (the app, WebView2, Edge)' {
   Get-Process | Where-Object { $_.ProcessName -match 'kvgrainy|msedgewebview2|msedge' } |
     Select-Object Id, ProcessName, SessionId, Responding, MainWindowTitle | Format-Table -AutoSize
 }
-Section "DevTools port $Port: does anything answer?" {
+Section "DevTools port ${Port}: does anything answer?" {
   try {
     $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/json/version" -UseBasicParsing -TimeoutSec 5
     "HTTP $($r.StatusCode): $($r.Content.Substring(0, [Math]::Min(300, $r.Content.Length)))"
