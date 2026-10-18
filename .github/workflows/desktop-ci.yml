@@ -68,6 +68,11 @@ jobs:
       # The specs share fixtures with the web app's, which use its packages (gifenc).
       - run: npm ci
         working-directory: web
+      # The window is drawn by the WebView2 runtime. GitHub's Windows Server image notes list Edge but not the runtime,
+      # so make sure it is there (this prints its version either way); see desktop/e2e/ensure-webview2.ps1.
+      - name: Make sure the WebView2 runtime is installed
+        shell: pwsh
+        run: ./desktop/e2e/ensure-webview2.ps1
       # The Playwright browser is not needed: the tests attach to the app's own WebView2 over CDP.
       - name: Drive the real app
         run: npx playwright test

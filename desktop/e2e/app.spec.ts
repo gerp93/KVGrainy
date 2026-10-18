@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -19,6 +19,19 @@ const work = mkdtempSync(join(tmpdir(), 'kvgrainy-desktop-e2e-'));
 // The app's own output goes to test-results/app.log, which CI uploads when a run fails, so a hosted
 // runner that cannot start the window says why instead of just timing out.
 const logPath = resolve(import.meta.dirname, '../test-results/app.log');
+
+/** What the machine looked like when the window could not be reached (diagnose.ps1); never throws. */
+function diagnose(): string {
+  try {
+    return execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve(import.meta.dirname, 'diagnose.ps1'), '-ScreenshotPath', join(dirname(logPath), 'desktop.png')],
+      { encoding: 'utf8', timeout: 90_000 },
+    );
+  } catch (error) {
+    return `(the diagnostics could not run: ${error})`;
+  }
+}
 
 test.beforeAll(async () => {
   if (!existsSync(exe)) throw new Error(`the app has not been built: ${exe}`);
@@ -47,7 +60,10 @@ test.beforeAll(async () => {
     const output = existsSync(logPath) ? readFileSync(logPath, 'utf8').slice(-3000) : '(no output)';
     throw new Error(
       `could not reach the app over the WebView2 DevTools port (${exited === null ? 'still running' : `exited with ${exited}`}). App output:
-${output}`,
+${output}
+
+Machine state at that moment:
+${diagnose()}`,
     );
   }
   page = browser.contexts()[0]!.pages()[0]!;
