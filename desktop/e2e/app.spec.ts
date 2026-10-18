@@ -1,5 +1,6 @@
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { type AddressInfo, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -10,7 +11,8 @@ import { animatedGif, flatPng, photoPng } from '../../web/e2e/fixture';
 // running in the native Rust core through Tauri commands (not the WebAssembly build).
 
 const exe = resolve(import.meta.dirname, '../src-tauri/target/debug/kvgrainy-desktop.exe');
-const PORT = 9223;
+// The DevTools port is chosen at start-up (see freePort): a fixed one can fall in a range Windows reserves.
+let PORT = 0;
 let app: ChildProcess;
 let browser: Browser;
 let page: Page;
@@ -20,12 +22,28 @@ const work = mkdtempSync(join(tmpdir(), 'kvgrainy-desktop-e2e-'));
 // runner that cannot start the window says why instead of just timing out.
 const logPath = resolve(import.meta.dirname, '../test-results/app.log');
 
+/**
+ * A TCP port the operating system has just let us bind. Windows reserves ranges of ports (for Hyper-V and
+ * containers, and a hosted runner is a Hyper-V machine), and a browser told to listen on a reserved port fails
+ * silently, so a fixed number can work on one machine and never open on another.
+ */
+function freePort(): Promise<number> {
+  return new Promise((done, fail) => {
+    const probe = createServer();
+    probe.once('error', fail);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => done(port));
+    });
+  });
+}
+
 /** What the machine looked like when the window could not be reached (diagnose.ps1); never throws. */
 function diagnose(): string {
   try {
     return execFileSync(
       'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve(import.meta.dirname, 'diagnose.ps1'), '-ScreenshotPath', join(dirname(logPath), 'desktop.png')],
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve(import.meta.dirname, 'diagnose.ps1'), '-Port', String(PORT), '-ScreenshotPath', join(dirname(logPath), 'desktop.png')],
       { encoding: 'utf8', timeout: 90_000 },
     );
   } catch (error) {
@@ -36,6 +54,7 @@ function diagnose(): string {
 test.beforeAll(async () => {
   if (!existsSync(exe)) throw new Error(`the app has not been built: ${exe}`);
   mkdirSync(dirname(logPath), { recursive: true });
+  PORT = await freePort();
   const log = openSync(logPath, 'w');
   app = spawn(exe, [], {
     env: {

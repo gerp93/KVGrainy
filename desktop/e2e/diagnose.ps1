@@ -1,6 +1,6 @@
 # What the machine looks like when the app's window could not be reached. The end-to-end test runs this at the
 # moment it gives up, and puts the output in its error message, so a failed CI run says why.
-param([string]$ScreenshotPath)
+param([int]$Port, [string]$ScreenshotPath)
 $ErrorActionPreference = 'Continue'
 
 function Section([string]$Name, [scriptblock]$Body) {
@@ -24,6 +24,28 @@ Section 'WebView2 runtime (files)' {
 Section 'processes (the app, WebView2, Edge)' {
   Get-Process | Where-Object { $_.ProcessName -match 'kvgrainy|msedgewebview2|msedge' } |
     Select-Object Id, ProcessName, SessionId, Responding, MainWindowTitle | Format-Table -AutoSize
+}
+Section "DevTools port $Port: does anything answer?" {
+  try {
+    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/json/version" -UseBasicParsing -TimeoutSec 5
+    "HTTP $($r.StatusCode): $($r.Content.Substring(0, [Math]::Min(300, $r.Content.Length)))"
+  } catch { "no answer: $($_.Exception.Message)" }
+}
+Section 'TCP port ranges Windows reserves (a browser cannot listen on these)' {
+  netsh int ipv4 show excludedportrange protocol=tcp
+}
+Section 'WebView2 browser process command line (is the debugging flag there?)' {
+  Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+    Where-Object { $_.CommandLine -and $_.CommandLine -notmatch '--type=' } |
+    ForEach-Object { "pid $($_.ProcessId): $($_.CommandLine.Substring(0, [Math]::Min(900, $_.CommandLine.Length)))" }
+}
+Section 'WebView2 and Edge policies in the registry' {
+  foreach ($key in 'HKLM:\SOFTWARE\Policies\Microsoft\Edge', 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2', 'HKCU:\SOFTWARE\Policies\Microsoft\Edge') {
+    if (Test-Path $key) {
+      "$key"
+      (Get-ItemProperty $key | Select-Object * -ExcludeProperty PS* | Format-List | Out-String).TrimEnd()
+    } else { "$key (none)" }
+  }
 }
 Section 'listening TCP ports above 1024' {
   Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -gt 1024 } |

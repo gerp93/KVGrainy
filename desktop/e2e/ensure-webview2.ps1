@@ -1,8 +1,9 @@
 # Make sure the WebView2 runtime (the thing that draws the app's window) is installed, and print its version.
 #
-# GitHub's Windows Server image notes list Microsoft Edge but not the WebView2 runtime, and without the runtime a
-# Tauri app starts but never opens its page, so the desktop end-to-end tests cannot reach it. If the runtime is
-# already there this only prints its version; otherwise it installs Microsoft's Evergreen runtime silently.
+# GitHub's Windows Server image notes list Microsoft Edge but not the WebView2 runtime, so this was added in case the
+# runtime was missing. It is not: a hosted runner already has it (version 154 when this was checked), and the end-to-end
+# failure turned out to be something else (see docs/desktop.md). Kept as a cheap guard that prints the version in every
+# run; if the runtime is ever missing it installs Microsoft's Evergreen runtime silently.
 $ErrorActionPreference = 'Stop'
 $guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
 
